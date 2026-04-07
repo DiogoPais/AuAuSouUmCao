@@ -1,1 +1,0 @@
-# Fotos e DOcumentos retirados nesta fase
