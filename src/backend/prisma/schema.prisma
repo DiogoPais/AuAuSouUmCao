@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. ENUMERAÇÕES
+enum TipoPerfil {
+  Admin
+  Vet
+  Staff
+}
+
+enum EstadoVacina {
+  Valido
+  Caducado
+}
+
+enum EstadoClinico {
+  Saudavel
+  Quarentena
+}
+
+enum EstadoReserva {
+  Pendente
+  CheckIn
+  CheckOut
+  Cancelada
+}
+
+enum EstadoBox {
+  Suja
+  Higienizada
+}
+
+enum TipoServico {
+  Grooming
+  Passeio
+  Adestramento
+}
+
+// ==========================================
+// 2. ENTIDADES BASE E HERANÇA
+// ==========================================
+model Utilizador {
+  idUtilizador String @id @default(uuid())
+  nome         String
+  email        String @unique
+  password     String
+
+  tutor       Tutor?
+  funcionario Funcionario?
+}
+
+model Tutor {
+  nif      String @id
+  contacto String
+
+  utilizadorId String     @unique
+  utilizador   Utilizador @relation(fields: [utilizadorId], references: [idUtilizador], onDelete: Cascade)
+
+  // Exigência do Prisma: não cria coluna na BD, serve apenas para o código saber 
+  // que o Animal tem a chave estrangeira (tutorNif) a apontar para aqui.
+  animais Animal[]
+}
+
+model Funcionario {
+  idFuncionario String     @id @default(uuid())
+  perfil        TipoPerfil
+
+  utilizadorId String     @unique
+  utilizador   Utilizador @relation(fields: [utilizadorId], references: [idUtilizador], onDelete: Cascade)
+
+  // Relações clínicas
+  prescricoes Prescricao[]
+  logsMedicos LogMedicacao[]
+}
+
+// ==========================================
+// 3. ENTIDADES DE DOMÍNIO E RELACIONAMENTOS
+// ==========================================
+model Animal {
+  idAnimal    String        @id @default(uuid())
+  nome        String
+  raca        String?
+  reatividade String
+  microchip   String        @unique
+  estado      EstadoClinico @default(Saudavel)
+
+  // Os animais é que têm tutor (Chave Estrangeira aqui)
+  tutorNif String
+  tutor    Tutor  @relation(fields: [tutorNif], references: [nif])
+
+  planoVacinal PlanoVacinal?
+  reservas     Reserva[] // Exigência Prisma (A FK está na Reserva)
+  diarioBordo  DiarioBordo[] // Exigência Prisma (A FK está no DiarioBordo)
+  prescricoes  Prescricao[] // Exigência Prisma (A FK está na Prescricao)
+}
+
+model PlanoVacinal {
+  idPlano          String       @id @default(uuid())
+  dataUltimaVacina DateTime
+  documento        String
+  isValido         Boolean      @default(false)
+  estado           EstadoVacina
+
+  animalId String @unique
+  animal   Animal @relation(fields: [animalId], references: [idAnimal], onDelete: Cascade)
+}
+
+model Box {
+  numero   Int       @id
+  tamanho  Int
+  ocupacao Int
+  estado   EstadoBox @default(Higienizada)
+
+  reservas Reserva[] // Exigência Prisma (A FK está na Reserva)
+}
+
+model Reserva {
+  idReserva   String        @id @default(uuid())
+  dataEntrada DateTime
+  dataSaida   DateTime
+  valor       Float
+  estado      EstadoReserva @default(Pendente)
+
+  // A reserva tem animal e tem box (As Chaves Estrangeiras ficam aqui)
+  animalId String
+  animal   Animal @relation(fields: [animalId], references: [idAnimal])
+
+  boxNumero Int
+  box       Box @relation(fields: [boxNumero], references: [numero])
+
+  // A reserva tem a fatura (Fatura não tem referência direta à reserva)
+  faturaId String?  @unique
+  fatura   Faturas? @relation(fields: [faturaId], references: [idFaturas])
+
+  servicos Servico[] // Exigência Prisma (A FK está no Servico para permitir múltiplos)
+}
+
+model Servico {
+  idServico String      @id @default(uuid())
+  data      DateTime
+  preco     Float
+  tipo      TipoServico
+
+  // Numa base de dados relacional, para uma Reserva ter vários serviços, 
+  // o Serviço TEM de ter a chave estrangeira da Reserva.
+  reservaId String
+  reserva   Reserva @relation(fields: [reservaId], references: [idReserva])
+}
+
+model Faturas {
+  idFaturas  String @id @default(uuid())
+  nifCliente String
+  valorTotal Float
+  documento  String
+
+  // Sem referência direta à Reserva, a Reserva é que lhe aponta.
+  reserva Reserva?
+}
+
+model DiarioBordo {
+  idRegisto String   @id @default(uuid())
+  descricao String
+  timestamp DateTime @default(now())
+  fotos     String[]
+
+  // O diário é que tem animal (Chave estrangeira aqui)
+  animalId String
+  animal   Animal @relation(fields: [animalId], references: [idAnimal])
+}
+
+// 4. CLÍNICA / MEDICAMENTOS / STOCK
+model Stock {
+  idItem       String @id @default(uuid())
+  nome         String
+  quantidade   Int
+  limiteAlerta Int
+
+  medicamento Medicamento? // Preparado para a Herança (1:1)
+}
+
+model Medicamento {
+  idMedicamento String @id @default(uuid())
+  concentracao  Float
+
+  // Herda de Stock (Relação 1:1 onde Medicamento guarda o ID do Stock)
+  stockId String @unique
+  stock   Stock  @relation(fields: [stockId], references: [idItem], onDelete: Cascade)
+}
+
+model Prescricao {
+  idPrescricao  String      @id @default(uuid())
+  dosagem       Float
+  frequencia    String
+  data          DateTime
+  animalId      String
+  animal        Animal      @relation(fields: [animalId], references: [idAnimal])
+  funcionarioId String
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
+}
+
+model LogMedicacao {
+  idLog         String      @id @default(uuid())
+  timestamp     DateTime    @default(now())
+  funcionarioId String
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
+}
