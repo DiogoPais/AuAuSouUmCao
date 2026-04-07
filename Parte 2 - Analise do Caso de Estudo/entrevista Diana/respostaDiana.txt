@@ -1,0 +1,52 @@
+Olá! Sou a Diana Gonçalves Silva, fundadora do "Au Au... Sou um Cão!". Como podem imaginar, entre o curso de Medicina Veterinária na UMinho e a gestão de um hotel que cresceu muito além do planeado, o meu tempo é escasso e o meu pragmatismo é uma questão de sobrevivência. Estou aqui para vos dar a visão real de quem está no terreno, a tratar de patudos enquanto tenta não se afogar em papéis e mensagens de WhatsApp.
+
+---
+
+### Bloco A: Génese, Motivação e Objetivos (O Passado e a Visão)
+
+**1. O Insight Inicial: O "Clique"**
+O clique foi uma mistura de necessidade pessoal e oportunidade de mercado em Braga durante a pandemia (2021). Eu já tinha os meus cães e sentia na pele a dificuldade de encontrar um sítio que eu, como futura veterinária, confiasse plenamente. Vi que as pessoas em Braga estavam a adotar mais animais no confinamento, mas não havia estruturas com uma visão clínica e etológica séria. Decidi que, se não encontrava o padrão de excelência que queria, eu própria o criaria com o apoio do meu namorado.
+
+**2. Missão e Valores: Sobrevivência ou Padrão Diferenciado**
+Embora tenha começado como um projeto de vida, a minha formação em Veterinária nunca me permitiria que fosse "apenas sobrevivência". A missão sempre foi a excelência baseada na ciência. Queria um espaço onde o maneio sanitário e o controlo clínico fossem a base. Os donos deixam cá os animais precisamente porque sabem que eu deteto uma otite, uma claudicação subtil ou um sintoma de gastroenterite muito antes de um leigo.
+
+**3. Evolução do Conceito e Moldura Académica**
+Começámos de forma artesanal, eu e o meu namorado a fazer tudo. Hoje temos uma estrutura de **20 a 30 quartos individuais**, mas o percurso académico moldou tudo desde o dia um: desde a escolha de desinfetantes não tóxicos e protocolos de isolamento para tosses suspeitas, até à criação de fichas clínicas rigorosas com registo de peso, apetite e dejecções. Não somos um "depósito de cães"; somos um centro de bem-estar com supervisão técnica.
+
+**4. Superação de Expectativas: Dos 20 aos 120**
+Honestamente? É assustador e exaustivo. Nunca imaginei que em épocas altas como agosto ou o Natal passaríamos de 30 para **120 animais** (recorrendo a ocupação dupla de cães compatíveis e staff extra). Essa escala alterou os meus objetivos: passei de focar apenas no cuidado direto para focar na **fiabilidade do processo**. Com 120 animais, o erro humano é o meu maior inimigo. Preciso de tecnologia porque a minha formação clínica não serve de nada se eu não souber, com 100% de certeza, qual cão tomou qual comprimido.
+
+---
+
+### Bloco B: Engenharia de Requisitos (Operacional e Técnico)
+
+**1. Gestão de Inventário e Saúde (Medicação e Alimentação)**
+Atualmente, o controlo é feito em quadros brancos e cadernos, o que é um perigo.
+*   **Requisito de Medicação:** O sistema **tem** de gerir stock de medicamentos críticos (ex: insulina para diabéticos, fenobarbital para epiléticos) e emitir alertas de stock baixo e, crucialmente, de **validade**. Preciso de um log de administração: quem deu, que dose, a que horas e se houve reação.
+*   **Requisito de Alimentação:** Tenho cães com dietas renais, hipoalergénicas ou pancreatite. O sistema deve emitir etiquetas de refeição para evitar que o staff troque as rações por engano.
+
+**2. Rastreabilidade de Incidentes**
+Hoje, se um cão se arranha a brincar ou apresenta diarreia, anotamos num caderno. Isso é ineficiente e juridicamente perigoso.
+*   **Requisito:** Preciso que o software gere um **Histórico de Incidentes** exportável em PDF para o dono ou seguradora, com fotos, descrição clínica (ex: "edema localizado"), tratamento aplicado e timestamp. Se eu tiver de encaminhar um cão para uma consulta externa de urgência, quero carregar num botão e enviar todo o relatório clínico para o colega veterinário.
+
+**3. Regras de Alocação de Quartos (Vizinhança)**
+Gerir a "vizinhança" de cabeça é um puzzle impossível em picos de lotação.
+*   **As minhas regras:** Cães reativos/agressivos isolados; cães grandes não podem estar ao lado de cães minúsculos (o ruído e presença assustam); cães seniores precisam de zonas calmas e cães com patologias transmissíveis em quarentena.
+*   **Requisito:** O sistema deve ter um **algoritmo de sugestão de quartos** baseado em etiquetas (Reativo, Idoso, Porte, Fugitivo) e bloquear alocações conflituosas.
+
+**4. Faturação Complexa (Cancelamentos e Extensões)**
+As contas ao fim do mês são um caos entre estadias prolongadas, banhos de última hora e extensões não planeadas (quando o voo do dono atrasa).
+*   **Requisito:** Automação total de políticas de cancelamento (ex: retenção de 30% em cancelamentos <48h), descontos progressivos por longas estadias (ex: 10% após o 15º dia) e faturação automática de serviços extra (banhos, tosquias, administração de medicação complexa). O check-out tem de ser rápido, sem contas de somar à mão com o cliente à espera.
+
+**5. Comunicação com o Dono (Diário de Bordo)**
+O WhatsApp está a matar a produtividade da equipa. O meu namorado passa horas a enviar fotos individualmente.
+*   **Requisito:** Um "Diário de Bordo" integrado. O staff tira uma foto na app, escreve "Comeu bem e brincou com o Rex" e o dono recebe uma notificação automática. Sem conversas paralelas infinitas que nos tiram o foco do cuidado animal.
+
+**6. Segurança e Permissões (Perfis de Acesso)**
+Pragmatismo aqui: segregação de dados é essencial.
+*   **Staff (Cuidadores):** Devem ver apenas a ficha clínica, restrições de alimentação, horários de medicação e tarefas do dia. Não devem ver dados financeiros ou faturas.
+*   **Receção/Gestão:** Acesso total a reservas, contactos dos donos e faturação.
+*   **Veterinário (Eu):** Acesso a auditoria e edição de prescrições clínicas.
+
+**Resumo da Urgência:**
+O "Au Au... Sou um Cão!" precisa de funcionar com o rigor de uma clínica hospitalar e a fluidez de um hotel moderno. Com o meu namorado e com os funcionários, não conseguimos escalar mais sem um sistema que elimine o erro humano e nos devolva o tempo para o que realmente importa: o bem-estar dos animais. podemos avançar com o desenvolvimento?

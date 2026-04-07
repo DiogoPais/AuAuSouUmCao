@@ -1,0 +1,23 @@
+Bloco A:
+
+O Insight Inicial: Recuando ao momento da criação, qual foi o "clique" para transformar a dificuldade de emprego na pandemia num hotel canino? Foi uma necessidade pessoal com os teus próprios cães ou algo que observaste no mercado de Braga?
+
+Missão e Valores: Quando abriste as portas, qual era o objetivo principal? Era apenas um negócio de sobrevivência ou já existia a ambição de criar um padrão de cuidados diferenciado pela tua formação em Veterinária?
+
+Evolução do Conceito: O hotel começou com a estrutura que tem hoje ou foi crescendo organicamente? Como é que o teu percurso académico em Medicina Veterinária moldou os serviços que decidiste oferecer desde o primeiro dia?
+
+Superação de Expectativas: Alguma vez imaginaste, no início, que passarias de 20 para 120 animais em épocas altas? Como é que essa escala alterou os teus objetivos iniciais para o negócio?
+
+Bloco B:
+
+Gestão de Inventário e Saúde: Como controlas atualmente o stock de medicamentos e rações específicas para cães com patologias? O sistema deve emitir alertas de stock baixo ou de validade de medicamentos?
+
+Rastreabilidade de Incidentes: Se um cão se aleija ou apresenta sintomas durante a estadia, como é feito o registo hoje? Precisas que o software gere um "histórico de incidentes" que possa ser exportado para o dono ou para a seguradora?
+
+Regras de Alocação (Quartos): Tens regras de "vizinhança" (ex: não colocar cães reativos ao lado de outros, separar por porte ou idade)? O sistema deve sugerir o quarto ideal com base no perfil do animal?
+
+Faturação Complexa: Como lidas com cancelamentos de última hora ou extensões de estadia não planeadas? O sistema deve calcular automaticamente multas ou descontos por períodos longos?
+
+Comunicação com o Dono: Atualmente perdes muito tempo a enviar fotos/updates por WhatsApp? Gostarias que o sistema tivesse uma funcionalidade de "Diário de Bordo" onde o staff faz upload de uma foto e o dono recebe uma notificação?
+
+Segurança e Permissões: O que é que o Staff pode ver/editar em comparação com a Receção? (Ex: O staff deve ver dados financeiros ou apenas a ficha clínica e de alimentação?)
