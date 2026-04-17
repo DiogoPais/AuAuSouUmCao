@@ -10,8 +10,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares globais
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: [
+    'http://localhost:5173', // Para quando testares no teu PC com o Vite
+    'https://main.dgvaudjmhakvj.amplifyapp.com/' // SUBSTITUI pelo teu link do Amplify!
+  ],
+  credentials: true
+}));app.use(express.json());
 
 // Rota principal de verificação de saúde (Health Check)
 app.get('/health', (req, res) => {
