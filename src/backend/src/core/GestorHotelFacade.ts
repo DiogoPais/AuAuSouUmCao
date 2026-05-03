@@ -92,6 +92,10 @@ export class GestorHotelFacade {
     return await this.gestClinica.prescreverMedicacao(dados);
   }
 
+  async listarStock() {
+    return await this.gestClinica.listarStockCompleto();
+  }
+
   // ==========================================
   // DELEGAÇÃO: VETERINÁRIA
   // ==========================================

@@ -372,4 +372,24 @@ router.post('/veterinaria/prescricao', async (req, res) => {
   }
 });
 
+// ==========================================
+// STOCK E INVENTÁRIO
+// ==========================================
+router.get('/stock', async (req, res) => {
+  try {
+    const stock = await gestor.listarStock();
+    
+    const stockFormatado = stock.map(s => ({
+      idItem: s.idItem,
+      nome: s.nome,
+      quantidade: s.quantidade,
+      tipo: s.medicamento ? 'Medicamento' : 'Racao'
+    }));
+    
+    res.json(stockFormatado);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 export default router;

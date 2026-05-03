@@ -3,34 +3,34 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes/api';
 import path from 'path';
+// ADICIONA ESTA LINHA:
+import { iniciarJobsDeReservas } from './jobs/ReservaJobs';
 
-// Carregar variáveis de ambiente
 dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares globais
 app.use(cors({
   origin: [
-    'http://localhost:5173', // Para quando testares no teu PC com o Vite
+    'http://localhost:5173', 
     'https://main.dgvaudjmhakvj.amplifyapp.com' 
   ],
   credentials: true
 }));
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Rota principal de verificação de saúde (Health Check)
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'OK', mensagem: 'Servidor AuAuSouUmCão a correr!' });
+    res.status(200).json({ status: 'OK', mensagem: 'Servidor AuAuSouUmC o a correr!' });
 });
 
-// Montar as rotas da nossa API
 app.use('/api', apiRoutes);
 
-// Iniciar o servidor
 app.listen(PORT, () => {
     console.log(`Servidor a correr na porta ${PORT}`);
     console.log(`Health Check: http://localhost:${PORT}/health`);
+    
+    // ADICIONA ESTA LINHA: Acorda o trabalhador invis vel!
+    iniciarJobsDeReservas();
 });

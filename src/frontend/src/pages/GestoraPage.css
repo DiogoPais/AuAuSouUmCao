@@ -1,0 +1,309 @@
+/* ==================== PAINEL DA GESTORA ==================== */
+.gestora-page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #FFFFFF;
+}
+
+/* BARRA DE NAVEGAÇÃO */
+.gestora-navbar {
+  display: flex;
+  background-color: #E0E0E0;
+  height: 45px;
+  width: 100%;
+}
+
+.gestora-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: #1A1A1A;
+  cursor: pointer;
+  border-right: 1px solid #AAAAAA;
+  transition: background-color 0.2s;
+}
+
+.gestora-tab:last-child {
+  border-right: none;
+}
+
+.gestora-tab.active {
+  background-color: #BBBBBB;
+  font-weight: bold;
+  border-radius: 8px 8px 0 0;
+}
+
+/* CONTEÚDO PRINCIPAL */
+.gestora-content {
+  flex: 1;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* BOTÃO TERMINAR SESSÃO GLOBAL */
+.btn-logout-global {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #E74C3C;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+  transition: opacity 0.2s;
+  z-index: 100;
+}
+.btn-logout-global:hover { opacity: 0.8; }
+
+
+/* ==================== TAB: DASHBOARD ==================== */
+.dashboard-alert-card {
+  background-color: #E8E8E8;
+  border-radius: 10px;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.alert-info h3 {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  font-weight: bold;
+  color: #1A1A1A;
+}
+
+.alert-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.btn-alerta-neutro {
+  background-color: #FFFFFF;
+  border: 1px solid #CCCCCC;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 13px;
+  color: #1A1A1A;
+  cursor: pointer;
+}
+
+.btn-alerta-urgente {
+  background-color: #E74C3C;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #FFFFFF;
+  cursor: pointer;
+}
+
+.dashboard-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.btn-quarentena-toggle {
+  background-color: #FFB6C1;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: #1A1A1A;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+
+/* ==================== TAB: CALENDÁRIO ==================== */
+.calendario-wrapper {
+  background-color: #FFFFFF;
+  border: 1px solid #CCCCCC;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.cal-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.cal-cell {
+  height: 70px;
+  border-radius: 4px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cal-cell .dia-num {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.cal-cell .capacidade {
+  font-size: 11px;
+  text-align: center;
+  font-weight: bold;
+  color: #1A1A1A;
+}
+
+.cal-cell.vazio { background-color: transparent; }
+.cal-cell.ok { background-color: #ADFF2F; }
+.cal-cell.lotado { background-color: #E74C3C; color: white; }
+.cal-cell.lotado .capacidade { color: white; }
+
+.calendario-footer {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.calendario-footer p { font-size: 14px; margin: 0; }
+.btn-sim {
+  background-color: #D0D0D0;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+
+/* ==================== TAB: STOCK ==================== */
+.stock-main-card {
+  background-color: #E8E8E8;
+  border-radius: 12px;
+  padding: 25px 30px;
+  margin: 0 15px;
+}
+
+.stock-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #CCCCCC;
+}
+.stock-section:last-child { border-bottom: none; }
+
+.stock-section-left { display: flex; flex-direction: column; gap: 4px; }
+.stock-section-left h3 { margin: 0; font-size: 15px; font-weight: bold; }
+.stock-section-left p { margin: 0; font-size: 13px; color: #555; }
+.stock-section-right { display: flex; gap: 8px; }
+
+.btn-stock {
+  background-color: #FFFFFF;
+  border: 1px solid #CCCCCC;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* STOCK ATUAL & HISTÓRICO (Layout com Filtros) */
+.stock-view-container {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+}
+
+.stock-filters {
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.stock-filters h4 { margin: 0; font-size: 15px; font-weight: bold; }
+
+.filter-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.toggle-switch {
+  width: 30px;
+  height: 16px;
+  background-color: #CCCCCC;
+  border-radius: 8px;
+  position: relative;
+  cursor: pointer;
+}
+
+.ord-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-ord {
+  width: 22px;
+  height: 22px;
+  border: none;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-ord.ativo { background-color: #3498DB; color: white; }
+.btn-ord.inativo { background-color: #D0D0D0; color: #1A1A1A; }
+
+.stock-list {
+  flex: 1;
+  background-color: #E8E8E8;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stock-item {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  padding: 12px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge-falta {
+  background-color: #E74C3C;
+  color: white;
+  font-weight: bold;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-align: center;
+}

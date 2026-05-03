@@ -8,6 +8,8 @@ import MarcacoesPage from './pages/MarcacoesPage';
 import RececaoPage from './pages/RececaoPage';
 import StaffPage from './pages/StaffPage';
 import VeterinariaPage from './pages/VeterinariaPage';
+import GatewayGestoraPage from './pages/GatewayGestoraPage';
+import GestoraPage from './pages/GestoraPage';
 
 function App() {
   return (
@@ -26,6 +28,10 @@ function App() {
         <Route path="/rececao" element={<RececaoPage />} />
         <Route path="/staff" element={<StaffPage/>}/>
         <Route path="/vet" element={<VeterinariaPage/>}/>
+        {/* ROTA DA GATEWAY DA GESTORA */}
+        <Route path="/admin-gateway" element={<GatewayGestoraPage />} />
+        {/* ROTA DO PAINEL DA GESTORA (Que vamos construir de seguida) */}
+        <Route path="/gestao" element={<GestoraPage />} />
         
       </Routes>
     </BrowserRouter>

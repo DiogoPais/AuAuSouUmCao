@@ -21,6 +21,10 @@ export class GestClinicaFacade {
     return await this.prescricaoDAO.create(dadosPrescricao);
   }
 
+  async listarStockCompleto() {
+    return await this.stockDAO.findAll();
+  }
+
   // Regra de Negócio: Log de Administração Imutável (RF.22 / R15)
   async registarAdministracaoFoco(funcionarioId: string) {
     return await this.logsDAO.createLog(funcionarioId);

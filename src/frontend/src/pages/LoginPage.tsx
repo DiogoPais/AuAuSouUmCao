@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
       
       // O REDIRECIONAMENTO AUTOMÁTICO MÁGICO!
       if (role === 'Admin') {
-        navigate('/gestao');
+        navigate('/admin-gateway')
       } else if (role === 'Staff') {
         navigate('/staff');
       } else if (role === 'Vet') {
