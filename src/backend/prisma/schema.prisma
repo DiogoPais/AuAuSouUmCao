@@ -149,14 +149,13 @@ model Reserva {
 }
 
 model Servico {
-  idServico String      @id @default(uuid())
+  idServico String        @id @default(uuid())
   data      DateTime
   preco     Float
   tipo      TipoServico
   estado    EstadoServico @default(Pendente)
+  descricao String?       // NOVO: Descrição do serviço
 
-  // Numa base de dados relacional, para uma Reserva ter vários serviços, 
-  // o Serviço TEM de ter a chave estrangeira da Reserva.
   reservaId String
   reserva   Reserva @relation(fields: [reservaId], references: [idReserva])
 }
@@ -189,27 +188,51 @@ model Stock {
   quantidade   Int
   limiteAlerta Int
 
-  medicamento Medicamento? // Preparado para a Herança (1:1)
+  medicamento  Medicamento? // Herança 1:1
+  racao        Racao?       // Herança 1:1
 }
 
 model Medicamento {
   idMedicamento String @id @default(uuid())
   concentracao  Float
 
-  // Herda de Stock (Relação 1:1 onde Medicamento guarda o ID do Stock)
+  stockId String @unique
+  stock   Stock  @relation(fields: [stockId], references: [idItem], onDelete: Cascade)
+
+  linhas  LinhaPrescricao[]
+}
+
+model Racao {
+  idRacao String @id @default(uuid())
+  marca   String? // Opcional, ex: Royal Canin
+
   stockId String @unique
   stock   Stock  @relation(fields: [stockId], references: [idItem], onDelete: Cascade)
 }
 
 model Prescricao {
   idPrescricao  String      @id @default(uuid())
-  dosagem       Float
-  frequencia    String
   data          DateTime
+  
   animalId      String
   animal        Animal      @relation(fields: [animalId], references: [idAnimal])
   funcionarioId String
   funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
+
+  // Uma prescrição tem várias linhas (medicamentos diferentes)
+  linhas        LinhaPrescricao[]
+}
+
+model LinhaPrescricao {
+  idLinha       String      @id @default(uuid())
+  dosagem       Float
+  frequencia    String
+  
+  prescricaoId  String
+  prescricao    Prescricao  @relation(fields: [prescricaoId], references: [idPrescricao], onDelete: Cascade)
+  
+  medicamentoId String
+  medicamento   Medicamento @relation(fields: [medicamentoId], references: [idMedicamento])
 }
 
 model LogMedicacao {

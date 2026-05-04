@@ -67,11 +67,6 @@ const GestoraPage: React.FC = () => {
     fetchDados();
   }, [API_URL]);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
-
   // =====================================
   // RENDERIZAR: DASHBOARD (Com alertas dinâmicos)
   // =====================================
@@ -154,9 +149,6 @@ const GestoraPage: React.FC = () => {
               </div>
             );
           })}
-        </div>
-        <div className="calendario-footer">
-          <p>O calendário atualiza automaticamente com base nas reservas reais da base de dados.</p>
         </div>
       </div>
     );
@@ -299,8 +291,8 @@ const GestoraPage: React.FC = () => {
         )}
       </main>
 
-      <button className="btn-logout-global" onClick={handleLogout}>
-        Terminar Sessão
+      <button className="btn-logout-global" onClick={() => navigate('/admin-gateway')}>
+        Voltar à Gateway
       </button>
     </div>
   );

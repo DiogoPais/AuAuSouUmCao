@@ -173,29 +173,30 @@ export class ReservaDAO {
   }
 
     async findTarefasDoDia() {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      
-      const amanha = new Date(hoje);
-      amanha.setDate(amanha.getDate() + 1);
-  
+    const hoje = new Date();
+    const inicioDia = new Date(hoje.setHours(0, 0, 0, 0));
+    const fimDia = new Date(hoje.setHours(23, 59, 59, 999));
+
       return await prisma.servico.findMany({
         where: {
           data: {
-            gte: hoje,
-            lt: amanha
+            gte: inicioDia,
+            lte: fimDia,
           },
-          estado: { in: ['Pendente', 'Feito'] } // Mostra pendentes e em progresso
+          estado: 'Pendente', // Apenas tarefas que o Staff ainda não fez
+          
+          // 👇 A CORREÇÃO ENTRA AQUI 👇
+          reserva: {
+            estado: 'CheckIn' // Garante que o animal já está fisicamente no hotel!
+          }
         },
         include: {
           reserva: {
             include: {
-              animal: true,
-              box: true
+              animal: true
             }
           }
-        },
-        orderBy: { data: 'asc' }
+        }
       });
     }
   
