@@ -13,30 +13,53 @@ export class GestClinicaFacade {
     this.logsDAO = new LogsDAO();
   }
 
-  // Regra de Negócio: Validação Clínica (US03)
+  // ==========================================
+  // PRESCRIÇÃO E STOCK
+  // ==========================================
   async prescreverMedicacao(dadosPrescricao: any) {
-    if (dadosPrescricao.dosagem <= 0) {
-      throw new Error("A dosagem clínica deve ser superior a zero.");
+    // dadosPrescricao = { animalId, funcionarioId, linhas: [{ medicamentoId, dosagem, frequencia }] }
+    
+    if (!dadosPrescricao.linhas || dadosPrescricao.linhas.length === 0) {
+      throw new Error("A prescrição deve conter pelo menos um medicamento.");
     }
-    return await this.prescricaoDAO.create(dadosPrescricao);
+
+    for (const linha of dadosPrescricao.linhas) {
+      if (linha.dosagem <= 0) {
+        throw new Error("A dosagem clínica deve ser superior a zero.");
+      }
+    }
+
+    // 1. Criar a Prescrição (O DAO trata do Nested Write)
+    const novaPrescricao = await this.prescricaoDAO.create(dadosPrescricao);
+
+    // 2. Descontar o Stock usando o StockDAO
+    for (const linha of dadosPrescricao.linhas) {
+      const med = await this.stockDAO.findMedicamentoComStock(linha.medicamentoId);
+      if (med && med.stock) {
+        const novaQuantidade = Math.max(0, med.stock.quantidade - linha.dosagem);
+        await this.stockDAO.updateQuantidade(med.stockId, novaQuantidade);
+      }
+    }
+
+    return novaPrescricao;
   }
 
   async listarStockCompleto() {
     return await this.stockDAO.findAll();
   }
 
-  // Regra de Negócio: Log de Administração Imutável (RF.22 / R15)
   async registarAdministracaoFoco(funcionarioId: string) {
     return await this.logsDAO.createLog(funcionarioId);
   }
 
   // ==========================================
-  // GESTÃO DE CHECKS DIÁRIOS
+  // GESTÃO DE CHECKS DIÁRIOS E QUARENTENA
   // ==========================================
   async registarCheckDiario(idAnimal: string, notas: string) {
     if (!notas || notas.trim().length === 0) {
       throw new Error("O check deve incluir notas do veterinário.");
     }
+    // Delega para o DAO (que vai mudar o 'check' para true e adicionar ao DiarioBordo)
     return await this.prescricaoDAO.registarCheckDiario(idAnimal, notas);
   }
 

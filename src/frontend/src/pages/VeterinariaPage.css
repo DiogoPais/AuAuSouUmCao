@@ -195,9 +195,10 @@
   display: block;
   font-weight: bold;
   color: #333;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
+/* --- AJUSTE NAS NOTAS INPUT PARA SUPORTAR FORMULÁRIO DE PRESCRIÇÃO --- */
 .notas-input {
   width: 100%;
   padding: 10px;
@@ -205,8 +206,20 @@
   border-radius: 4px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Apenas as caixas de texto grandes (textarea) terão altura mínima */
+textarea.notas-input {
   resize: vertical;
   min-height: 100px;
+}
+
+/* Estilo extra para os dropdowns (select) */
+select.notas-input {
+  background-color: white;
+  cursor: pointer;
+  appearance: auto;
 }
 
 .botoes-check {

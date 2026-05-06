@@ -96,6 +96,7 @@ model Animal {
   reatividade String
   microchip   String        @unique
   estado      EstadoClinico @default(Saudavel)
+  check       Boolean       @default(false)
 
   // Os animais é que têm tutor (Chave Estrangeira aqui)
   tutorNif String
