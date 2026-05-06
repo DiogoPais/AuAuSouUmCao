@@ -23,4 +23,11 @@ export class StockDAO {
       include: { stock: true }
     });
   }
+
+  async findItemPorNome(nome: string) {
+    return await prisma.stock.findFirst({
+      where: { nome: nome },
+      include: { medicamento: true }
+    });
+  }
 }

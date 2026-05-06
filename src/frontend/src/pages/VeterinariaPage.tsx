@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { AlertCircle, CheckCircle, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle, Plus, Check, XCircle, Clock, Save, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './VeterinariaPage.css';
@@ -32,42 +32,71 @@ const VeterinariaPage: React.FC = () => {
   const [caesParaVerificar, setCaesParaVerificar] = useState<Animal[]>([]);
   const [caesQuarentena, setCaesQuarentena] = useState<Animal[]>([]);
   const [caesSelecionado, setCaesSelecionado] = useState<Animal | null>(null);
+  
   const [notasCheck, setNotasCheck] = useState('');
-  const [showModoQuarentena, setShowModoQuarentena] = useState(false);
   const [motivoQuarentena, setMotivoQuarentena] = useState('');
-  const [loading, setLoading] = useState(true);
+  
+  const [showModoQuarentena, setShowModoQuarentena] = useState(false);
   const [showModoPrescrever, setShowModoPrescrever] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // NOVOS ESTADOS PARA A PRESCRIÇÃO
+  // ESTADOS DA PRESCRIÇÃO E TRATAMENTOS
   const [medicamentos, setMedicamentos] = useState<any[]>([]);
   const [todosAnimais, setTodosAnimais] = useState<Animal[]>([]);
-  const [prescricoesAnimal, setPrescricoesAnimal] = useState<any[]>([]);
-  const [formPrescricao, setFormPrescricao] = useState({
-    animalId: '',
+  const [tratamentosAtivos, setTratamentosAtivos] = useState<any[]>([]);
+  const [agora, setAgora] = useState(new Date());
+
+  // ESTADOS DA NOVA RECEITA (OPÇÃO B - LISTA ACUMULATIVA)
+  const [animalSelecionadoParaReceita, setAnimalSelecionadoParaReceita] = useState('');
+  const [linhasReceita, setLinhasReceita] = useState<any[]>([]);
+  const [linhaAtual, setLinhaAtual] = useState({
     medicamentoId: '',
     dosagem: '',
-    frequencia: ''
+    frequencia: '',
+    totalDoses: ''
   });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-  // Carregar dados
+  // O Motor do Countdown
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setAgora(new Date());
+    }, 60000); 
+    return () => clearInterval(intervalo);
+  }, []);
+
+  const extrairHorasFrequencia = (freq: string): number => {
+    const match = freq.match(/(\d+)/);
+    return match ? parseInt(match[0], 10) : 0;
+  };
+
+  const carregarTratamentosAtivos = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/veterinaria/tratamentos-ativos`);
+      setTratamentosAtivos(res.data);
+    } catch (err) {
+      console.error('Erro ao carregar tratamentos:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchDados = async () => {
       try {
         setLoading(true);
-        const [resVerificar, resQuarentena, resStock, resAnimais] = await Promise.all([
+        const [resVerificar, resQuarentena, resStock, resAnimais, resTratamentos] = await Promise.all([
           axios.get(`${API_URL}/api/veterinaria/caes-para-verificar`),
           axios.get(`${API_URL}/api/veterinaria/caes-quarentena`),
           axios.get(`${API_URL}/api/stock`),
-          axios.get(`${API_URL}/api/animais`)
+          axios.get(`${API_URL}/api/animais`),
+          axios.get(`${API_URL}/api/veterinaria/tratamentos-ativos`)
         ]);
         
         setCaesParaVerificar(resVerificar.data);
         setCaesQuarentena(resQuarentena.data);
         setTodosAnimais(resAnimais.data);
+        setTratamentosAtivos(resTratamentos.data);
         
-        // Filtramos o stock para mostrar apenas o que é Medicamento na dropdown
         const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
         setMedicamentos(apenasMedicamentos);
       } catch (err) {
@@ -76,26 +105,23 @@ const VeterinariaPage: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchDados();
   }, []);
 
+  // FUNÇÕES PADRÃO (Check e Quarentena)...
   const handleFinalizarCheck = async () => {
     if (!caesSelecionado || !notasCheck.trim()) {
       alert('Por favor, preencha as notas do check.');
       return;
     }
-
     try {
-      await axios.post(`${API_URL}/api/veterinaria/check-diario/${caesSelecionado.idAnimal}`, {
-        notas: notasCheck
-      });
-
+      await axios.post(`${API_URL}/api/veterinaria/check-diario/${caesSelecionado.idAnimal}`, { notas: notasCheck });
       alert('Check realizado com sucesso!');
       setCaesParaVerificar(caesParaVerificar.filter(c => c.idAnimal !== caesSelecionado.idAnimal));
       setCaesSelecionado(null);
       setNotasCheck('');
       setShowModoQuarentena(false);
+      setShowModoPrescrever(false);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erro ao finalizar check');
     }
@@ -106,15 +132,9 @@ const VeterinariaPage: React.FC = () => {
       alert('Por favor, preencha o motivo da quarentena.');
       return;
     }
-
     try {
-      await axios.patch(`${API_URL}/api/veterinaria/quarentena/${caesSelecionado.idAnimal}`, {
-        ativar: true,
-        motivo: motivoQuarentena
-      });
-
+      await axios.patch(`${API_URL}/api/veterinaria/quarentena/${caesSelecionado.idAnimal}`, { ativar: true, motivo: motivoQuarentena });
       alert('Quarentena ativada! Animal será registado no diário.');
-      // Atualizar listas
       setCaesParaVerificar(caesParaVerificar.filter(c => c.idAnimal !== caesSelecionado.idAnimal));
       setCaesQuarentena([...caesQuarentena, { ...caesSelecionado, estado: 'Quarentena' }]);
       setCaesSelecionado(null);
@@ -126,95 +146,108 @@ const VeterinariaPage: React.FC = () => {
     }
   };
 
-  const carregarPrescricoesAnimal = async (animalId: string) => {
-    try {
-      const res = await axios.get(`${API_URL}/api/veterinaria/prescricoes/${animalId}`);
-      setPrescricoesAnimal(res.data);
-    } catch (err) {
-      console.error('Erro ao carregar prescrições:', err);
+  // ==========================================
+  // LÓGICA DA OPÇÃO B (RECEITA AVANÇADA)
+  // ==========================================
+  const handleAdicionarLinha = () => {
+    if (!linhaAtual.medicamentoId || !linhaAtual.dosagem || !linhaAtual.frequencia || !linhaAtual.totalDoses) {
+      alert('Preencha todos os campos do medicamento.');
+      return;
     }
+    setLinhasReceita([...linhasReceita, { ...linhaAtual }]);
+    setLinhaAtual({ medicamentoId: '', dosagem: '', frequencia: '', totalDoses: '' }); // Limpa form local
   };
 
-  const handleCriarPrescricao = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formPrescricao.animalId || !formPrescricao.medicamentoId || !formPrescricao.dosagem || !formPrescricao.frequencia) {
-      alert('Por favor, preencha todos os campos da prescrição.');
+  const handleRemoverLinha = (index: number) => {
+    const novaLista = [...linhasReceita];
+    novaLista.splice(index, 1);
+    setLinhasReceita(novaLista);
+  };
+
+  const handleSubmeterReceitaCompleta = async () => {
+    if (!animalSelecionadoParaReceita) {
+      alert('Tem de selecionar um cão primeiro.');
+      return;
+    }
+    if (linhasReceita.length === 0) {
+      alert('Adicione pelo menos um medicamento à receita.');
       return;
     }
 
     try {
       const payload = {
-        animalId: formPrescricao.animalId,
-        // Não enviar funcionarioId - backend usa o primeiro Vet como default
-        linhas: [
-          {
-            medicamentoId: formPrescricao.medicamentoId,
-            dosagem: Number(formPrescricao.dosagem),
-            frequencia: formPrescricao.frequencia
-          }
-        ]
+        animalId: animalSelecionadoParaReceita,
+        linhas: linhasReceita.map(l => ({
+          medicamentoId: l.medicamentoId, 
+          dosagem: Number(l.dosagem),
+          frequencia: l.frequencia,
+          totalDoses: Number(l.totalDoses)
+        }))
       };
 
       await axios.post(`${API_URL}/api/veterinaria/prescricao`, payload);
+      alert('Receita gravada com sucesso! O stock foi descontado do total.');
       
-      alert('Prescrição criada com sucesso! O stock do medicamento foi descontado.');
+      // Limpar formulário
+      setAnimalSelecionadoParaReceita('');
+      setLinhasReceita([]);
       
-      // Limpa o formulário e atualiza o stock
-      const animalIdTemp = formPrescricao.animalId;
-      setFormPrescricao({ animalId: animalIdTemp, medicamentoId: '', dosagem: '', frequencia: '' });
-      
+      // Atualizar tabelas
       const resStock = await axios.get(`${API_URL}/api/stock`);
-      const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
-      setMedicamentos(apenasMedicamentos);
-
-      // Recarregar prescrições do animal
-      await carregarPrescricoesAnimal(animalIdTemp);
+      setMedicamentos(resStock.data.filter((item: any) => item.tipo === 'Medicamento'));
+      await carregarTratamentosAtivos();
       
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao criar prescrição. Verifique se há stock suficiente.');
+      alert(err.response?.data?.error || 'Erro ao criar prescrição.');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="veterinaria-page-container">
-        <Header userData={vet} />
-        <div className="loading">Carregando...</div>
-        <Footer />
-      </div>
-    );
-  }
+  // ADMINISTRAÇÃO DE MEDICAMENTOS
+  const handleDarDose = async (idLinha: string) => {
+    try {
+      const vetId = localStorage.getItem('user_id') || '';
+      await axios.post(`${API_URL}/api/veterinaria/tratamentos/${idLinha}/administrar`, {
+        funcionarioId: vetId
+      });
+      alert('Dose registada com sucesso!');
+      await carregarTratamentosAtivos(); 
+      setAgora(new Date()); 
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao registar dose.');
+    }
+  };
+
+  const handleFinalizarTratamento = async (idLinha: string) => {
+    if (!window.confirm("Forçar finalização deste tratamento? Ele desaparecerá da lista.")) return;
+    try {
+      await axios.patch(`${API_URL}/api/veterinaria/tratamentos/${idLinha}/finalizar`);
+      await carregarTratamentosAtivos(); 
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao finalizar tratamento.');
+    }
+  };
+
+  if (loading) return <div className="loading">Carregando...</div>;
 
   return (
     <div className="veterinaria-page-container">
       <Header userData={vet} />
 
       <main className="vet-main">
-        {/* TABS */}
         <div className="vet-tabs">
-          <button
-            className={`tab-btn ${tab === 'verificar' ? 'ativo' : ''}`}
-            onClick={() => setTab('verificar')}
-          >
+          <button className={`tab-btn ${tab === 'verificar' ? 'ativo' : ''}`} onClick={() => setTab('verificar')}>
             Verificar Cães ({caesParaVerificar.length})
           </button>
-          <button
-            className={`tab-btn quarentena-badge ${tab === 'quarentena' ? 'ativo' : ''}`}
-            onClick={() => setTab('quarentena')}
-          >
+          <button className={`tab-btn quarentena-badge ${tab === 'quarentena' ? 'ativo' : ''}`} onClick={() => setTab('quarentena')}>
             🚨 Quarentena ({caesQuarentena.length})
           </button>
-          <button
-            className={`tab-btn ${tab === 'prescricao' ? 'ativo' : ''}`}
-            onClick={() => setTab('prescricao')}
-          >
-            Prescrições
+          <button className={`tab-btn ${tab === 'prescricao' ? 'ativo' : ''}`} onClick={() => setTab('prescricao')}>
+            Prescrições e Tratamentos
           </button>
         </div>
 
-        {/* CONTEÚDO POR TAB */}
         <div className="vet-content">
+          
           {/* TAB 1: VERIFICAR CÃES */}
           {tab === 'verificar' && (
             <section className="vet-section">
@@ -229,6 +262,7 @@ const VeterinariaPage: React.FC = () => {
                         setCaesSelecionado(cao);
                         setNotasCheck('');
                         setShowModoQuarentena(false);
+                        setShowModoPrescrever(false);
                       }}
                     >
                       <div className="cao-header">
@@ -248,15 +282,14 @@ const VeterinariaPage: React.FC = () => {
                 )}
               </div>
 
-              {/* PAINEL DE VERIFICAÇÃO */}
-              {caesSelecionado && !showModoQuarentena && (
+              {/* PAINEL PADRÃO: CHECK DIÁRIO */}
+              {caesSelecionado && !showModoQuarentena && !showModoPrescrever && (
                 <section className="verificacao-panel">
                   <div className="cao-detalhes">
                     <h3>{caesSelecionado.nome}</h3>
                     <p>Raça: <strong>{caesSelecionado.raca || 'N/A'}</strong></p>
                     <p>Reatividade: <strong>{caesSelecionado.reatividade}</strong></p>
                     <p>Tutor: <strong>{caesSelecionado.tutor?.utilizador?.nome || 'N/A'}</strong></p>
-                    <p>Contacto: <strong>{caesSelecionado.tutor?.nif || 'N/A'}</strong></p>
                   </div>
 
                   <div className="formulario-check">
@@ -264,7 +297,7 @@ const VeterinariaPage: React.FC = () => {
                     <textarea
                       value={notasCheck}
                       onChange={(e) => setNotasCheck(e.target.value)}
-                      placeholder="Ex: Animal alerta, sem sinais de doença. Respiração normal. Pele saudável."
+                      placeholder="Ex: Animal alerta, sem sinais de doença."
                       className="notas-input"
                     />
                   </div>
@@ -282,107 +315,26 @@ const VeterinariaPage: React.FC = () => {
                     <button
                       className="btn-finalizar-check"
                       onClick={() => {
-                        setFormPrescricao({ ...formPrescricao, animalId: caesSelecionado.idAnimal });
-                        carregarPrescricoesAnimal(caesSelecionado.idAnimal);
-                        setShowModoPrescrever(true);
+                        setAnimalSelecionadoParaReceita(caesSelecionado.idAnimal);
+                        setTab('prescricao'); // SALTA LOGO PARA O SEPARADOR DA PRESCRIÇÃO
                       }}
                       style={{ background: '#7DDFD3' }}
                     >
-                      <Plus size={18} /> Receitar Medicamento
+                      <Plus size={18} /> Ir para Prescrição
                     </button>
                   </div>
                 </section>
               )}
 
-              {/* MODO PRESCREVER */}
-              {caesSelecionado && showModoPrescrever && (
-                <section className="verificacao-panel">
-                  <h3>Prescrever Medicamento - {caesSelecionado.nome}</h3>
-                  
-                  <form onSubmit={handleCriarPrescricao} style={{ marginBottom: '20px' }}>
-                    <label>Medicamento (Stock Atual):</label>
-                    <select 
-                      className="notas-input"
-                      value={formPrescricao.medicamentoId}
-                      onChange={(e) => setFormPrescricao({...formPrescricao, medicamentoId: e.target.value})}
-                      style={{ marginBottom: '15px', padding: '10px' }}
-                    >
-                      <option value="">-- Escolha um Medicamento --</option>
-                      {medicamentos.map(med => (
-                        <option key={med.idItem} value={med.medicamento?.idMedicamento}>
-                          {med.nome} (Disponível: {med.quantidade})
-                        </option>
-                      ))}
-                    </select>
-
-                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label>Dosagem:</label>
-                        <input 
-                          type="number" 
-                          min="0.1"
-                          step="0.1"
-                          className="notas-input"
-                          placeholder="Ex: 1"
-                          value={formPrescricao.dosagem}
-                          onChange={(e) => setFormPrescricao({...formPrescricao, dosagem: e.target.value})}
-                          style={{ padding: '10px' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label>Frequência:</label>
-                        <input 
-                          type="text" 
-                          className="notas-input"
-                          placeholder="Ex: 12/12h durante 5 dias"
-                          value={formPrescricao.frequencia}
-                          onChange={(e) => setFormPrescricao({...formPrescricao, frequencia: e.target.value})}
-                          style={{ padding: '10px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <button type="submit" className="btn-finalizar-check" style={{ width: '100%', justifyContent: 'center' }}>
-                      <Plus size={18} /> Receitar e Descontar
-                    </button>
-                  </form>
-
-                  {/* Prescrições anteriores */}
-                  {prescricoesAnimal.length > 0 && (
-                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
-                      <h4>Prescrições Anteriores:</h4>
-                      {prescricoesAnimal.map((prescricao: any) => (
-                        <div key={prescricao.idPrescricao} style={{ marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '5px' }}>
-                          <p><strong>Data:</strong> {new Date(prescricao.data).toLocaleDateString('pt-PT')}</p>
-                          <p><strong>Veterinário:</strong> {prescricao.funcionario?.utilizador?.nome || 'N/A'}</p>
-                          {prescricao.linhas.map((linha: any) => (
-                            <div key={linha.idLinha} style={{ marginLeft: '20px', fontSize: '0.9em' }}>
-                              <p>• {linha.medicamento?.stock?.nome || 'Medicamento'}: {linha.dosagem} ({linha.frequencia})</p>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <button
-                    className="btn-cancelar"
-                    onClick={() => {
-                      setShowModoPrescrever(false);
-                      setFormPrescricao({ animalId: '', medicamentoId: '', dosagem: '', frequencia: '' });
-                      setPrescricoesAnimal([]);
-                    }}
-                    style={{ marginTop: '15px', width: '100%' }}
-                  >
-                    Fechar
-                  </button>
-                </section>
-              )}
+              {/* MODO QUARENTENA */}
+              {caesSelecionado && showModoQuarentena && (
+                <section className="quarentena-panel">
+                  <h3>🚨 Ativar Quarentena - {caesSelecionado.nome}</h3>
                   <label>Motivo da Quarentena:</label>
                   <textarea
                     value={motivoQuarentena}
                     onChange={(e) => setMotivoQuarentena(e.target.value)}
-                    placeholder="Ex: Suspeita de doença contagiosa. Observar por 7 dias."
+                    placeholder="Ex: Suspeita de doença contagiosa..."
                     className="notas-input"
                   />
                   <div className="botoes-quarentena">
@@ -401,6 +353,8 @@ const VeterinariaPage: React.FC = () => {
                   </div>
                 </section>
               )}
+            </section>
+          )}
 
           {/* TAB 2: QUARENTENA */}
           {tab === 'quarentena' && (
@@ -417,7 +371,6 @@ const VeterinariaPage: React.FC = () => {
                       <p className="cao-info">Raça: {cao.raca || 'N/A'}</p>
                       <p className="cao-info">Tutor: {cao.tutor?.utilizador?.nome || 'N/A'}</p>
                       <p className="cao-info">Estado: {cao.estado}</p>
-                      <button className="btn-detalhes">Ver Detalhes</button>
                     </div>
                   ))
                 ) : (
@@ -427,124 +380,176 @@ const VeterinariaPage: React.FC = () => {
             </section>
           )}
 
-          {/* TAB 3: PRESCRIÇÕES */}
+          {/* TAB 3: PRESCRIÇÕES E TRATAMENTOS ATIVOS */}
           {tab === 'prescricao' && (
             <section className="vet-section">
-              <h2>Prescrições Médicas</h2>
+              <h2>Tratamentos e Prescrições</h2>
               
-              <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-                {/* Coluna Esquerda: Formulário */}
-                <div style={{ flex: 1, minWidth: '400px' }}>
-                  <h3>Nova Prescrição</h3>
-                  <form onSubmit={handleCriarPrescricao} className="formulario-check">
-                    
-                    <label>Selecionar Cão:</label>
-                    <select 
-                      className="notas-input" 
-                      value={formPrescricao.animalId}
-                      onChange={(e) => {
-                        setFormPrescricao({...formPrescricao, animalId: e.target.value});
-                        if (e.target.value) carregarPrescricoesAnimal(e.target.value);
-                      }}
-                      style={{ marginBottom: '15px', padding: '10px' }}
-                    >
-                      <option value="">-- Escolha um Cão --</option>
-                      {todosAnimais.map(cao => (
-                        <option key={cao.idAnimal} value={cao.idAnimal}>{cao.nome}</option>
-                      ))}
-                    </select>
+              <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
+                
+                {/* COLUNA ESQUERDA: A NOVA RECEITA ACUMULATIVA */}
+                <div style={{ flex: 1, minWidth: '400px', background: '#f8f8f8', padding: '20px', borderRadius: '8px', border: '1px solid #7DDFD3' }}>
+                  <h3 style={{ marginTop: 0, color: '#333' }}>Criar Receita Médica</h3>
+                  
+                  <label>1. Selecionar Cão (Paciente):</label>
+                  <select 
+                    className="notas-input" 
+                    value={animalSelecionadoParaReceita}
+                    onChange={(e) => setAnimalSelecionadoParaReceita(e.target.value)}
+                    style={{ marginBottom: '20px', padding: '10px' }}
+                  >
+                    <option value="">-- Escolha um Cão --</option>
+                    {todosAnimais.map(cao => (
+                      <option key={cao.idAnimal} value={cao.idAnimal}>{cao.nome}</option>
+                    ))}
+                  </select>
 
-                    <label>Medicamento (Stock Atual):</label>
-                    <select 
-                      className="notas-input"
-                      value={formPrescricao.medicamentoId}
-                      onChange={(e) => setFormPrescricao({...formPrescricao, medicamentoId: e.target.value})}
-                      style={{ marginBottom: '15px', padding: '10px' }}
-                    >
-                      <option value="">-- Escolha um Medicamento --</option>
-                      {medicamentos.map(med => (
-                        <option key={med.idItem} value={med.medicamento?.idMedicamento}>
-                          {med.nome} (Disponível: {med.quantidade})
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ borderTop: '2px dashed #ccc', margin: '20px 0' }}></div>
 
-                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label>Dosagem:</label>
-                        <input 
-                          type="number" 
-                          min="0.1"
-                          step="0.1"
-                          className="notas-input"
-                          placeholder="Ex: 1"
-                          value={formPrescricao.dosagem}
-                          onChange={(e) => setFormPrescricao({...formPrescricao, dosagem: e.target.value})}
-                          style={{ padding: '10px' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label>Frequência:</label>
-                        <input 
-                          type="text" 
-                          className="notas-input"
-                          placeholder="Ex: 12/12h durante 5 dias"
-                          value={formPrescricao.frequencia}
-                          onChange={(e) => setFormPrescricao({...formPrescricao, frequencia: e.target.value})}
-                          style={{ padding: '10px' }}
-                        />
-                      </div>
+                  <label>2. Adicionar Medicamento à Receita:</label>
+                  <select 
+                    className="notas-input"
+                    value={linhaAtual.medicamentoId}
+                    onChange={(e) => setLinhaAtual({...linhaAtual, medicamentoId: e.target.value})}
+                    style={{ marginBottom: '10px', padding: '10px' }}
+                  >
+                    <option value="">-- Escolha um Medicamento --</option>
+                    {medicamentos.map(med => (
+                      <option key={med.idItem} value={med.nome}>
+                        {med.nome} (Em stock: {med.quantidade})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px' }}>Dosagem:</label>
+                      <input type="number" min="0.1" step="0.1" className="notas-input" placeholder="Ex: 1"
+                        value={linhaAtual.dosagem} onChange={(e) => setLinhaAtual({...linhaAtual, dosagem: e.target.value})} />
                     </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px' }}>Doses Totais:</label>
+                      <input type="number" min="1" step="1" className="notas-input" placeholder="Ex: 10"
+                        value={linhaAtual.totalDoses} onChange={(e) => setLinhaAtual({...linhaAtual, totalDoses: e.target.value})} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px' }}>Frequência:</label>
+                      <input type="text" className="notas-input" placeholder="Ex: 12/12h"
+                        value={linhaAtual.frequencia} onChange={(e) => setLinhaAtual({...linhaAtual, frequencia: e.target.value})} />
+                    </div>
+                  </div>
 
-                    <button type="submit" className="btn-finalizar-check" style={{ width: '100%', justifyContent: 'center' }}>
-                      <Plus size={18} /> Receitar e Descontar do Stock
-                    </button>
-                  </form>
-                </div>
+                  <button type="button" onClick={handleAdicionarLinha} style={{ width: '100%', padding: '10px', background: '#e0e0e0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    + Adicionar à Lista
+                  </button>
 
-                {/* Coluna Direita: Prescrições */}
-                <div style={{ flex: 1, minWidth: '400px', background: '#f9f9f9', padding: '15px', borderRadius: '8px', maxHeight: '600px', overflowY: 'auto' }}>
-                  <h3>Histórico de Prescrições</h3>
-                  {formPrescricao.animalId && prescricoesAnimal.length > 0 ? (
-                    prescricoesAnimal.map((prescricao: any) => (
-                      <div key={prescricao.idPrescricao} style={{ marginBottom: '15px', padding: '10px', background: 'white', borderRadius: '5px', border: '1px solid #ddd' }}>
-                        <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
-                          {new Date(prescricao.data).toLocaleDateString('pt-PT')} às {new Date(prescricao.data).toLocaleTimeString('pt-PT', {hour: '2-digit', minute:'2-digit'})}
-                        </p>
-                        <p style={{ margin: '5px 0', fontSize: '0.9em', color: '#666' }}>
-                          Por: {prescricao.funcionario?.utilizador?.nome || 'N/A'}
-                        </p>
-                        {prescricao.linhas.map((linha: any) => (
-                          <div key={linha.idLinha} style={{ marginLeft: '10px', fontSize: '0.9em', padding: '5px', background: '#f0f0f0', borderRadius: '3px', marginTop: '5px' }}>
-                            <p style={{ margin: '3px 0' }}>
-                              <strong>{linha.medicamento?.stock?.nome || 'Medicamento'}</strong>
-                            </p>
-                            <p style={{ margin: '2px 0', color: '#333' }}>
-                              Dosagem: {linha.dosagem}
-                            </p>
-                            <p style={{ margin: '2px 0', color: '#333' }}>
-                              Frequência: {linha.frequencia}
-                            </p>
-                          </div>
+                  {/* LISTA TEMPORÁRIA DA RECEITA */}
+                  {linhasReceita.length > 0 && (
+                    <div style={{ marginTop: '20px', background: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Medicamentos na Receita:</h4>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {linhasReceita.map((linha, index) => (
+                          <li key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed #eee', fontSize: '13px' }}>
+                            <span><strong>{linha.medicamentoId}</strong> - {linha.dosagem} unid. ({linha.frequencia}) x {linha.totalDoses} doses</span>
+                            <button onClick={() => handleRemoverLinha(index)} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                          </li>
                         ))}
-                      </div>
-                    ))
-                  ) : formPrescricao.animalId ? (
-                    <p style={{ color: '#999', textAlign: 'center', marginTop: '20px' }}>
-                      Nenhuma prescrição anterior para este animal
-                    </p>
-                  ) : (
-                    <p style={{ color: '#999', textAlign: 'center', marginTop: '20px' }}>
-                      Selecione um animal para ver prescrições
-                    </p>
+                      </ul>
+                      <button onClick={handleSubmeterReceitaCompleta} style={{ width: '100%', padding: '12px', background: '#7DDFD3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                        <Save size={18} /> Gravar Receita Completa
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {/* COLUNA DIREITA: TABELA DE TRATAMENTOS ATIVOS */}
+                <div style={{ flex: 2, minWidth: '550px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '15px', borderBottom: '1px solid #ddd', background: '#f8f8f8', borderRadius: '8px 8px 0 0' }}>
+                    <h3 style={{ margin: 0, color: '#333' }}>Tratamentos Ativos (Cães a Medicar)</h3>
+                  </div>
+                  
+                  <div style={{ overflowX: 'auto', maxHeight: '550px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#f0f0f0', zIndex: 1 }}>
+                        <tr>
+                          <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>Animal</th>
+                          <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>Remédio</th>
+                          <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>Progresso</th>
+                          <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>Próxima Toma</th>
+                          <th style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'center' }}>Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tratamentosAtivos.length > 0 ? (
+                          tratamentosAtivos.map((tratamento: any) => {
+                            const ultimoLog = tratamento.logsAdministracao?.[0]; // O log 0 é o mais recente porque ordenámos desc no DAO
+                            const totalDadas = tratamento.logsAdministracao?.length || 0;
+                            const horasIntervalo = extrairHorasFrequencia(tratamento.frequencia);
+                            
+                            let isPronto = true;
+                            let countdownStr = 'Pronto a Dar!';
+                            let rowBg = 'transparent';
+
+                            if (ultimoLog && horasIntervalo > 0) {
+                              const proximaToma = new Date(ultimoLog.timestamp);
+                              proximaToma.setHours(proximaToma.getHours() + horasIntervalo);
+
+                              if (agora < proximaToma) {
+                                isPronto = false;
+                                rowBg = '#fdfdfd';
+                                const diffMs = proximaToma.getTime() - agora.getTime();
+                                const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                                const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                countdownStr = `Faltam ${diffHrs}h ${diffMins}m`;
+                              } else {
+                                countdownStr = 'Na hora!';
+                                rowBg = '#fffaf0';
+                              }
+                            }
+
+                            return (
+                              <tr key={tratamento.idLinha} style={{ borderBottom: '1px solid #eee', backgroundColor: rowBg }}>
+                                <td style={{ padding: '12px', fontWeight: 'bold' }}>{tratamento.prescricao?.animal?.nome || 'N/A'}</td>
+                                <td style={{ padding: '12px' }}>
+                                  <span style={{ color: '#0066cc', fontWeight: '500' }}>{tratamento.medicamento?.stock?.nome}</span>
+                                  <div style={{ fontSize: '12px', color: '#666' }}>Dose: {tratamento.dosagem} | Freq: {tratamento.frequencia}</div>
+                                </td>
+                                <td style={{ padding: '12px', fontWeight: 'bold', color: '#444' }}>
+                                  {totalDadas} / {tratamento.totalDoses}
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                  <span style={{ background: isPronto ? '#e6f7ff' : '#f0f0f0', color: isPronto ? '#005580' : '#888', padding: '4px 8px', borderRadius: '4px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}>
+                                    <Clock size={14} /> {totalDadas === 0 ? "Primeira Toma!" : countdownStr}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  <button 
+                                    onClick={() => handleDarDose(tratamento.idLinha)}
+                                    disabled={!isPronto}
+                                    style={{ padding: '8px', background: isPronto ? '#28a745' : '#ccc', color: 'white', border: 'none', borderRadius: '4px', cursor: isPronto ? 'pointer' : 'not-allowed' }}
+                                  >
+                                    <Check size={16} /> Dar Dose
+                                  </button>
+                                  <button onClick={() => handleFinalizarTratamento(tratamento.idLinha)} style={{ padding: '8px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                    <XCircle size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr><td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#888' }}>Nenhum tratamento ativo.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             </section>
           )}
         </div>
       </main>
-
       <Footer />
     </div>
   );

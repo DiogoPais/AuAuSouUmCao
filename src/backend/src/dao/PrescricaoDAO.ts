@@ -10,7 +10,7 @@ export class PrescricaoDAO {
     });
   }
 
-  // O NOVO CREATE: Agora suporta a tabela LinhaPrescricao
+  // 1. O NOVO CREATE (Agora guarda o totalDoses)
   async create(dados: any) {
     return await prisma.prescricao.create({
       data: {
@@ -21,12 +21,66 @@ export class PrescricaoDAO {
           create: dados.linhas.map((linha: any) => ({
             dosagem: linha.dosagem,
             frequencia: linha.frequencia,
+            totalDoses: linha.totalDoses, // <--- ADICIONADO
             medicamentoId: linha.medicamentoId
           }))
         }
       },
-      include: { linhas: { include: { medicamento: { include: { stock: true } } } } } // Devolve as linhas para a Facade descontar o stock
+      include: { linhas: true } 
     });
+  }
+
+  // 2. PUXAR TRATAMENTOS ATIVOS (Sem o 'take: 1' para contar o histórico completo)
+  async listarTratamentosAtivos() {
+    return await prisma.linhaPrescricao.findMany({
+      where: { ativa: true },
+      include: {
+        medicamento: { include: { stock: true } },
+        prescricao: { 
+          include: { 
+            animal: true, 
+            funcionario: { include: { utilizador: true } } 
+          } 
+        },
+        logsAdministracao: {
+          orderBy: { timestamp: 'desc' } // Trazemos TODOS os logs para fazer a barra de progresso
+        }
+      },
+      orderBy: { prescricao: { data: 'desc' } }
+    });
+  }
+
+  // 3. REGISTAR TOMA E VERIFICAR FIM DO TRATAMENTO
+  async registarAdministracao(idLinha: string, idUtilizadorFrontEnd: string) {
+    const funcionario = await prisma.funcionario.findUnique({
+      where: { utilizadorId: idUtilizadorFrontEnd }
+    });
+
+    if (!funcionario) throw new Error("Não foi possível encontrar o perfil de Funcionário.");
+
+    // Regista a toma
+    const log = await prisma.logMedicacao.create({
+      data: {
+        linhaId: idLinha,
+        funcionarioId: funcionario.idFuncionario
+      }
+    });
+
+    // Puxa o histórico atualizado
+    const linha = await prisma.linhaPrescricao.findUnique({
+      where: { idLinha },
+      include: { logsAdministracao: true }
+    });
+
+    // MAGIA: Se os logs chegarem ou passarem o total de doses, desativa a linha!
+    if (linha && linha.logsAdministracao.length >= linha.totalDoses) {
+      await prisma.linhaPrescricao.update({
+        where: { idLinha },
+        data: { ativa: false }
+      });
+    }
+
+    return log;
   }
 
   async findByAnimal(animalId: string) {
@@ -139,5 +193,12 @@ export class PrescricaoDAO {
       select: { check: true }
     });
     return animal?.check ?? false;
+  }
+
+  async finalizarTratamento(idLinha: string) {
+    return await prisma.linhaPrescricao.update({
+      where: { idLinha },
+      data: { ativa: false }
+    });
   }
 }

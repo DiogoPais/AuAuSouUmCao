@@ -405,4 +405,38 @@ router.get('/stock', async (req, res) => {
   }
 });
 
+router.get('/veterinaria/tratamentos-ativos', async (req, res) => {
+  try {
+    const tratamentos = await gestor.listarTratamentosAtivos();
+    res.json(tratamentos);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/veterinaria/tratamentos/:idLinha/administrar', async (req, res) => {
+  try {
+    // Usar o ID do utilizador que vem no token JWT gerado no login
+    const idFuncionario = (req as any).user?.userId || req.body.funcionarioId;
+    
+    if (!idFuncionario) {
+      return res.status(400).json({ error: "ID do funcionário não fornecido." });
+    }
+
+    const log = await gestor.registarAdministracaoMedicamento(req.params.idLinha, idFuncionario);
+    res.status(201).json({ message: 'Medicação registada com sucesso!', log });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.patch('/veterinaria/tratamentos/:idLinha/finalizar', async (req, res) => {
+  try {
+    const tratamento = await gestor.finalizarTratamento(req.params.idLinha);
+    res.json({ message: 'Tratamento concluído!', tratamento });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 export default router;

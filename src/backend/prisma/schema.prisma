@@ -229,16 +229,25 @@ model LinhaPrescricao {
   dosagem       Float
   frequencia    String
   
+  totalDoses    Int         @default(1) 
+  ativa         Boolean     @default(true) 
+  
   prescricaoId  String
   prescricao    Prescricao  @relation(fields: [prescricaoId], references: [idPrescricao], onDelete: Cascade)
   
   medicamentoId String
   medicamento   Medicamento @relation(fields: [medicamentoId], references: [idMedicamento])
+
+  logsAdministracao LogMedicacao[] 
 }
 
 model LogMedicacao {
   idLog         String      @id @default(uuid())
   timestamp     DateTime    @default(now())
+  
   funcionarioId String
   funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
+
+  linhaId       String
+  linha         LinhaPrescricao @relation(fields: [linhaId], references: [idLinha], onDelete: Cascade)
 }

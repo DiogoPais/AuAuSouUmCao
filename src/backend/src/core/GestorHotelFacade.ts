@@ -156,4 +156,16 @@ export class GestorHotelFacade {
   async listarServicosFinalizados(animalId: string) {
     return await this.gestReservas.obterServicosFinalizadosHoje(animalId);
   }
+
+  async listarTratamentosAtivos() {
+    return await this.gestClinica.listarTratamentosAtivos();
+  }
+
+  async registarAdministracaoMedicamento(idLinha: string, idFuncionario: string) {
+    return await this.gestClinica.registarAdministracao(idLinha, idFuncionario);
+  }
+
+  async finalizarTratamento(idLinha: string) {
+    return await this.gestClinica.finalizarTratamento(idLinha);
+  }
 }
