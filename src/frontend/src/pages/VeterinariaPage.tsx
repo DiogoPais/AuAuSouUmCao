@@ -36,10 +36,12 @@ const VeterinariaPage: React.FC = () => {
   const [showModoQuarentena, setShowModoQuarentena] = useState(false);
   const [motivoQuarentena, setMotivoQuarentena] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showModoPrescrever, setShowModoPrescrever] = useState(false);
 
   // NOVOS ESTADOS PARA A PRESCRIÇÃO
   const [medicamentos, setMedicamentos] = useState<any[]>([]);
   const [todosAnimais, setTodosAnimais] = useState<Animal[]>([]);
+  const [prescricoesAnimal, setPrescricoesAnimal] = useState<any[]>([]);
   const [formPrescricao, setFormPrescricao] = useState({
     animalId: '',
     medicamentoId: '',
@@ -124,6 +126,15 @@ const VeterinariaPage: React.FC = () => {
     }
   };
 
+  const carregarPrescricoesAnimal = async (animalId: string) => {
+    try {
+      const res = await axios.get(`${API_URL}/api/veterinaria/prescricoes/${animalId}`);
+      setPrescricoesAnimal(res.data);
+    } catch (err) {
+      console.error('Erro ao carregar prescrições:', err);
+    }
+  };
+
   const handleCriarPrescricao = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -133,12 +144,9 @@ const VeterinariaPage: React.FC = () => {
     }
 
     try {
-      // O backend precisa do ID do funcionário (Vet). Vamos buscar ao localStorage
-      const vetId = localStorage.getItem('user_id') || 'funcionario-desconhecido';
-
       const payload = {
         animalId: formPrescricao.animalId,
-        funcionarioId: vetId,
+        // Não enviar funcionarioId - backend usa o primeiro Vet como default
         linhas: [
           {
             medicamentoId: formPrescricao.medicamentoId,
@@ -152,12 +160,16 @@ const VeterinariaPage: React.FC = () => {
       
       alert('Prescrição criada com sucesso! O stock do medicamento foi descontado.');
       
-      // Limpa o formulário e atualiza o stock chamando a API novamente
-      setFormPrescricao({ animalId: '', medicamentoId: '', dosagem: '', frequencia: '' });
+      // Limpa o formulário e atualiza o stock
+      const animalIdTemp = formPrescricao.animalId;
+      setFormPrescricao({ animalId: animalIdTemp, medicamentoId: '', dosagem: '', frequencia: '' });
       
       const resStock = await axios.get(`${API_URL}/api/stock`);
       const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
       setMedicamentos(apenasMedicamentos);
+
+      // Recarregar prescrições do animal
+      await carregarPrescricoesAnimal(animalIdTemp);
       
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erro ao criar prescrição. Verifique se há stock suficiente.');
@@ -267,14 +279,105 @@ const VeterinariaPage: React.FC = () => {
                     >
                       <AlertCircle size={18} /> Modo Quarentena
                     </button>
+                    <button
+                      className="btn-finalizar-check"
+                      onClick={() => {
+                        setFormPrescricao({ ...formPrescricao, animalId: caesSelecionado.idAnimal });
+                        carregarPrescricoesAnimal(caesSelecionado.idAnimal);
+                        setShowModoPrescrever(true);
+                      }}
+                      style={{ background: '#7DDFD3' }}
+                    >
+                      <Plus size={18} /> Receitar Medicamento
+                    </button>
                   </div>
                 </section>
               )}
 
-              {/* MODO QUARENTENA */}
-              {caesSelecionado && showModoQuarentena && (
-                <section className="quarentena-panel">
-                  <h3>🚨 Ativar Quarentena - {caesSelecionado.nome}</h3>
+              {/* MODO PRESCREVER */}
+              {caesSelecionado && showModoPrescrever && (
+                <section className="verificacao-panel">
+                  <h3>Prescrever Medicamento - {caesSelecionado.nome}</h3>
+                  
+                  <form onSubmit={handleCriarPrescricao} style={{ marginBottom: '20px' }}>
+                    <label>Medicamento (Stock Atual):</label>
+                    <select 
+                      className="notas-input"
+                      value={formPrescricao.medicamentoId}
+                      onChange={(e) => setFormPrescricao({...formPrescricao, medicamentoId: e.target.value})}
+                      style={{ marginBottom: '15px', padding: '10px' }}
+                    >
+                      <option value="">-- Escolha um Medicamento --</option>
+                      {medicamentos.map(med => (
+                        <option key={med.idItem} value={med.medicamento?.idMedicamento}>
+                          {med.nome} (Disponível: {med.quantidade})
+                        </option>
+                      ))}
+                    </select>
+
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label>Dosagem:</label>
+                        <input 
+                          type="number" 
+                          min="0.1"
+                          step="0.1"
+                          className="notas-input"
+                          placeholder="Ex: 1"
+                          value={formPrescricao.dosagem}
+                          onChange={(e) => setFormPrescricao({...formPrescricao, dosagem: e.target.value})}
+                          style={{ padding: '10px' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label>Frequência:</label>
+                        <input 
+                          type="text" 
+                          className="notas-input"
+                          placeholder="Ex: 12/12h durante 5 dias"
+                          value={formPrescricao.frequencia}
+                          onChange={(e) => setFormPrescricao({...formPrescricao, frequencia: e.target.value})}
+                          style={{ padding: '10px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn-finalizar-check" style={{ width: '100%', justifyContent: 'center' }}>
+                      <Plus size={18} /> Receitar e Descontar
+                    </button>
+                  </form>
+
+                  {/* Prescrições anteriores */}
+                  {prescricoesAnimal.length > 0 && (
+                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
+                      <h4>Prescrições Anteriores:</h4>
+                      {prescricoesAnimal.map((prescricao: any) => (
+                        <div key={prescricao.idPrescricao} style={{ marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '5px' }}>
+                          <p><strong>Data:</strong> {new Date(prescricao.data).toLocaleDateString('pt-PT')}</p>
+                          <p><strong>Veterinário:</strong> {prescricao.funcionario?.utilizador?.nome || 'N/A'}</p>
+                          {prescricao.linhas.map((linha: any) => (
+                            <div key={linha.idLinha} style={{ marginLeft: '20px', fontSize: '0.9em' }}>
+                              <p>• {linha.medicamento?.stock?.nome || 'Medicamento'}: {linha.dosagem} ({linha.frequencia})</p>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    className="btn-cancelar"
+                    onClick={() => {
+                      setShowModoPrescrever(false);
+                      setFormPrescricao({ animalId: '', medicamentoId: '', dosagem: '', frequencia: '' });
+                      setPrescricoesAnimal([]);
+                    }}
+                    style={{ marginTop: '15px', width: '100%' }}
+                  >
+                    Fechar
+                  </button>
+                </section>
+              )}
                   <label>Motivo da Quarentena:</label>
                   <textarea
                     value={motivoQuarentena}
@@ -298,8 +401,6 @@ const VeterinariaPage: React.FC = () => {
                   </div>
                 </section>
               )}
-            </section>
-          )}
 
           {/* TAB 2: QUARENTENA */}
           {tab === 'quarentena' && (
@@ -329,69 +430,116 @@ const VeterinariaPage: React.FC = () => {
           {/* TAB 3: PRESCRIÇÕES */}
           {tab === 'prescricao' && (
             <section className="vet-section">
-              <h2>Nova Prescrição Médica</h2>
+              <h2>Prescrições Médicas</h2>
               
-              <form onSubmit={handleCriarPrescricao} className="formulario-check" style={{ marginTop: '20px', maxWidth: '600px' }}>
-                
-                <label>Selecionar Cão:</label>
-                <select 
-                  className="notas-input" 
-                  value={formPrescricao.animalId}
-                  onChange={(e) => setFormPrescricao({...formPrescricao, animalId: e.target.value})}
-                  style={{ marginBottom: '15px', padding: '10px' }}
-                >
-                  <option value="">-- Escolha um Cão --</option>
-                  {todosAnimais.map(cao => (
-                    <option key={cao.idAnimal} value={cao.idAnimal}>{cao.nome}</option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+                {/* Coluna Esquerda: Formulário */}
+                <div style={{ flex: 1, minWidth: '400px' }}>
+                  <h3>Nova Prescrição</h3>
+                  <form onSubmit={handleCriarPrescricao} className="formulario-check">
+                    
+                    <label>Selecionar Cão:</label>
+                    <select 
+                      className="notas-input" 
+                      value={formPrescricao.animalId}
+                      onChange={(e) => {
+                        setFormPrescricao({...formPrescricao, animalId: e.target.value});
+                        if (e.target.value) carregarPrescricoesAnimal(e.target.value);
+                      }}
+                      style={{ marginBottom: '15px', padding: '10px' }}
+                    >
+                      <option value="">-- Escolha um Cão --</option>
+                      {todosAnimais.map(cao => (
+                        <option key={cao.idAnimal} value={cao.idAnimal}>{cao.nome}</option>
+                      ))}
+                    </select>
 
-                <label>Medicamento (Stock Atual):</label>
-                <select 
-                  className="notas-input"
-                  value={formPrescricao.medicamentoId}
-                  onChange={(e) => setFormPrescricao({...formPrescricao, medicamentoId: e.target.value})}
-                  style={{ marginBottom: '15px', padding: '10px' }}
-                >
-                  <option value="">-- Escolha um Medicamento --</option>
-                  {medicamentos.map(med => (
-                    <option key={med.idItem} value={med.medicamento?.idMedicamento}>
-                      {med.nome} (Disponível: {med.quantidade})
-                    </option>
-                  ))}
-                </select>
+                    <label>Medicamento (Stock Atual):</label>
+                    <select 
+                      className="notas-input"
+                      value={formPrescricao.medicamentoId}
+                      onChange={(e) => setFormPrescricao({...formPrescricao, medicamentoId: e.target.value})}
+                      style={{ marginBottom: '15px', padding: '10px' }}
+                    >
+                      <option value="">-- Escolha um Medicamento --</option>
+                      {medicamentos.map(med => (
+                        <option key={med.idItem} value={med.medicamento?.idMedicamento}>
+                          {med.nome} (Disponível: {med.quantidade})
+                        </option>
+                      ))}
+                    </select>
 
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                  <div style={{ flex: 1 }}>
-                    <label>Dosagem (Quantidade a descontar):</label>
-                    <input 
-                      type="number" 
-                      min="0.1"
-                      step="0.1"
-                      className="notas-input"
-                      placeholder="Ex: 1"
-                      value={formPrescricao.dosagem}
-                      onChange={(e) => setFormPrescricao({...formPrescricao, dosagem: e.target.value})}
-                      style={{ padding: '10px' }}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label>Frequência:</label>
-                    <input 
-                      type="text" 
-                      className="notas-input"
-                      placeholder="Ex: 12/12h durante 5 dias"
-                      value={formPrescricao.frequencia}
-                      onChange={(e) => setFormPrescricao({...formPrescricao, frequencia: e.target.value})}
-                      style={{ padding: '10px' }}
-                    />
-                  </div>
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label>Dosagem:</label>
+                        <input 
+                          type="number" 
+                          min="0.1"
+                          step="0.1"
+                          className="notas-input"
+                          placeholder="Ex: 1"
+                          value={formPrescricao.dosagem}
+                          onChange={(e) => setFormPrescricao({...formPrescricao, dosagem: e.target.value})}
+                          style={{ padding: '10px' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label>Frequência:</label>
+                        <input 
+                          type="text" 
+                          className="notas-input"
+                          placeholder="Ex: 12/12h durante 5 dias"
+                          value={formPrescricao.frequencia}
+                          onChange={(e) => setFormPrescricao({...formPrescricao, frequencia: e.target.value})}
+                          style={{ padding: '10px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn-finalizar-check" style={{ width: '100%', justifyContent: 'center' }}>
+                      <Plus size={18} /> Receitar e Descontar do Stock
+                    </button>
+                  </form>
                 </div>
 
-                <button type="submit" className="btn-finalizar-check" style={{ width: '100%', justifyContent: 'center' }}>
-                  <Plus size={18} /> Receitar e Descontar do Stock
-                </button>
-              </form>
+                {/* Coluna Direita: Prescrições */}
+                <div style={{ flex: 1, minWidth: '400px', background: '#f9f9f9', padding: '15px', borderRadius: '8px', maxHeight: '600px', overflowY: 'auto' }}>
+                  <h3>Histórico de Prescrições</h3>
+                  {formPrescricao.animalId && prescricoesAnimal.length > 0 ? (
+                    prescricoesAnimal.map((prescricao: any) => (
+                      <div key={prescricao.idPrescricao} style={{ marginBottom: '15px', padding: '10px', background: 'white', borderRadius: '5px', border: '1px solid #ddd' }}>
+                        <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
+                          {new Date(prescricao.data).toLocaleDateString('pt-PT')} às {new Date(prescricao.data).toLocaleTimeString('pt-PT', {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                        <p style={{ margin: '5px 0', fontSize: '0.9em', color: '#666' }}>
+                          Por: {prescricao.funcionario?.utilizador?.nome || 'N/A'}
+                        </p>
+                        {prescricao.linhas.map((linha: any) => (
+                          <div key={linha.idLinha} style={{ marginLeft: '10px', fontSize: '0.9em', padding: '5px', background: '#f0f0f0', borderRadius: '3px', marginTop: '5px' }}>
+                            <p style={{ margin: '3px 0' }}>
+                              <strong>{linha.medicamento?.stock?.nome || 'Medicamento'}</strong>
+                            </p>
+                            <p style={{ margin: '2px 0', color: '#333' }}>
+                              Dosagem: {linha.dosagem}
+                            </p>
+                            <p style={{ margin: '2px 0', color: '#333' }}>
+                              Frequência: {linha.frequencia}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  ) : formPrescricao.animalId ? (
+                    <p style={{ color: '#999', textAlign: 'center', marginTop: '20px' }}>
+                      Nenhuma prescrição anterior para este animal
+                    </p>
+                  ) : (
+                    <p style={{ color: '#999', textAlign: 'center', marginTop: '20px' }}>
+                      Selecione um animal para ver prescrições
+                    </p>
+                  )}
+                </div>
+              </div>
             </section>
           )}
         </div>

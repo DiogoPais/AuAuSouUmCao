@@ -3,6 +3,13 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class PrescricaoDAO {
+  // Busca o primeiro funcionário Vet da BD
+  async buscarPrimeiroFuncionarioVet() {
+    return await prisma.funcionario.findFirst({
+      where: { perfil: 'Vet' }
+    });
+  }
+
   // O NOVO CREATE: Agora suporta a tabela LinhaPrescricao
   async create(dados: any) {
     return await prisma.prescricao.create({
@@ -18,14 +25,27 @@ export class PrescricaoDAO {
           }))
         }
       },
-      include: { linhas: true } // Devolve as linhas para a Facade descontar o stock
+      include: { linhas: { include: { medicamento: { include: { stock: true } } } } } // Devolve as linhas para a Facade descontar o stock
     });
   }
 
   async findByAnimal(animalId: string) {
     return await prisma.prescricao.findMany({ 
       where: { animalId },
-      include: { linhas: { include: { medicamento: { include: { stock: true } } } } } 
+      include: { 
+        linhas: { 
+          include: { 
+            medicamento: { 
+              include: { stock: true } 
+            } 
+          } 
+        },
+        funcionario: {
+          include: { utilizador: true }
+        },
+        animal: true
+      },
+      orderBy: { data: 'desc' }
     });
   }
 

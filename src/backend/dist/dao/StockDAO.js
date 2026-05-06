@@ -5,12 +5,21 @@ const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 class StockDAO {
     async findAll() {
-        return await prisma.stock.findMany({ include: { medicamento: true } });
+        // Incluímos a Racao e o Medicamento para o Frontend poder separar os tipos
+        return await prisma.stock.findMany({
+            include: { medicamento: true, racao: true }
+        });
     }
     async updateQuantidade(idItem, novaQuantidade) {
         return await prisma.stock.update({
             where: { idItem },
             data: { quantidade: novaQuantidade }
+        });
+    }
+    async findMedicamentoComStock(idMedicamento) {
+        return await prisma.medicamento.findUnique({
+            where: { idMedicamento },
+            include: { stock: true }
         });
     }
 }

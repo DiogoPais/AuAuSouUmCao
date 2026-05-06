@@ -105,6 +105,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(200).json({
       message: `Bem-vindo, ${utilizadorR.nome}!`,
       token, role: roleReal, nome: utilizadorR.nome,
+      userId: utilizadorR.idUtilizador,
       nif: utilizadorR.tutor?.nif || '---'
     });
   }
@@ -137,6 +138,7 @@ router.post('/verify-2fa', async (req: Request, res: Response) => {
     res.status(200).json({
       message: `Bem-vindo, ${utilizador.nome}!`,
       token, role: roleReal, nome: utilizador.nome,
+      userId: utilizador.idUtilizador,
       nif: utilizador.tutor?.nif || '---'
     });
   } catch (error: any) {
@@ -372,6 +374,15 @@ router.post('/veterinaria/prescricao', async (req, res) => {
   }
 });
 
+router.get('/veterinaria/prescricoes/:animalId', async (req, res) => {
+  try {
+    const prescricoes = await gestor.listarPrescricoesAnimal(req.params.animalId);
+    res.json(prescricoes);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // ==========================================
 // STOCK E INVENTÁRIO
 // ==========================================
@@ -383,7 +394,9 @@ router.get('/stock', async (req, res) => {
       idItem: s.idItem,
       nome: s.nome,
       quantidade: s.quantidade,
-      tipo: s.medicamento ? 'Medicamento' : 'Racao'
+      tipo: s.medicamento ? 'Medicamento' : 'Racao',
+      idMedicamento: s.medicamento?.idMedicamento || null,
+      idRacao: s.racao?.idRacao || null
     }));
     
     res.json(stockFormatado);

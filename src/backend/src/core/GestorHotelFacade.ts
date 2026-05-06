@@ -123,6 +123,10 @@ export class GestorHotelFacade {
     return await this.gestClinica.verificarSeJaFoiCheckHoje(idAnimal);
   }
 
+  async listarPrescricoesAnimal(animalId: string) {
+    return await this.gestClinica.listarPrescricoesAnimal(animalId);
+  }
+
   // ==========================================
   // DELEGAÇÃO: TAREFAS E FUNCIONÁRIOS
   // ==========================================

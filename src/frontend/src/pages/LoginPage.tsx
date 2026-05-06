@@ -37,7 +37,7 @@ const LoginPage: React.FC = () => {
       }
       
       // Extraímos também os dados do utilizador que o backend vai enviar
-      const { token, role, message, nome, nif, telemovel } = resposta.data;
+      const { token, role, message, nome, nif, telemovel, userId } = resposta.data;
       
       alert(message); 
       localStorage.setItem('token', token);
@@ -47,6 +47,7 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('user_nome', nome || '');
       localStorage.setItem('user_nif', nif || '');
       localStorage.setItem('user_telemovel', telemovel || '');
+      localStorage.setItem('user_id', userId || '');
       
       // O REDIRECIONAMENTO AUTOMÁTICO MÁGICO!
       if (role === 'Admin') {
@@ -81,7 +82,7 @@ const LoginPage: React.FC = () => {
     try {
       const resposta = await axios.post(`${API_URL}/api/verify-2fa`, { email, code });
       
-      const { token, role, message, nome, nif, telemovel } = resposta.data;
+      const { token, role, message, nome, nif, telemovel, userId } = resposta.data;
       
       alert(message); 
       localStorage.setItem('token', token);
@@ -91,6 +92,7 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('user_nome', nome || '');
       localStorage.setItem('user_nif', nif || '');
       localStorage.setItem('user_telemovel', telemovel || '');
+      localStorage.setItem('user_id', userId || '');
       
       // O REDIRECIONAMENTO AUTOMÁTICO MÁGICO!
       if (role === 'Admin') {

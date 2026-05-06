@@ -4,85 +4,111 @@ exports.PrescricaoDAO = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 class PrescricaoDAO {
+    // Busca o primeiro funcionário Vet da BD
+    async buscarPrimeiroFuncionarioVet() {
+        return await prisma.funcionario.findFirst({
+            where: { perfil: 'Vet' }
+        });
+    }
+    // O NOVO CREATE: Agora suporta a tabela LinhaPrescricao
     async create(dados) {
-        return await prisma.prescricao.create({ data: dados });
-    }
-    async findByAnimal(animalId) {
-        return await prisma.prescricao.findMany({ where: { animalId } });
-    }
-    // Registra um check diário da veterinária
-    async registarCheckDiario(idAnimal, notas) {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const amanha = new Date(hoje);
-        amanha.setDate(amanha.getDate() + 1);
-        const diarioExistente = await prisma.diarioBordo.findFirst({
-            where: {
-                animalId: idAnimal,
-                timestamp: {
-                    gte: hoje,
-                    lt: amanha
+        return await prisma.prescricao.create({
+            data: {
+                data: new Date(),
+                animalId: dados.animalId,
+                funcionarioId: dados.funcionarioId,
+                linhas: {
+                    create: dados.linhas.map((linha) => ({
+                        dosagem: linha.dosagem,
+                        frequencia: linha.frequencia,
+                        medicamentoId: linha.medicamentoId
+                    }))
                 }
             },
-            orderBy: {
-                timestamp: 'desc'
+            include: { linhas: { include: { medicamento: { include: { stock: true } } } } } // Devolve as linhas para a Facade descontar o stock
+        });
+    }
+    async findByAnimal(animalId) {
+        return await prisma.prescricao.findMany({
+            where: { animalId },
+            include: {
+                linhas: {
+                    include: {
+                        medicamento: {
+                            include: { stock: true }
+                        }
+                    }
+                },
+                funcionario: {
+                    include: { utilizador: true }
+                },
+                animal: true
+            },
+            orderBy: { data: 'desc' }
+        });
+    }
+    // A MÁGICA DO BOOLEANO: Lista cães hospedados que ainda não têm o "check" feito hoje
+    async listarCaesParaVerificar() {
+        return await prisma.animal.findMany({
+            where: {
+                check: false, // Usa o teu novo atributo de forma super otimizada!
+                reservas: {
+                    some: { estado: 'CheckIn' } // Só puxa os cães que já deram entrada no hotel
+                }
+            },
+            include: {
+                tutor: { include: { utilizador: true } },
+                reservas: {
+                    where: { estado: 'CheckIn' },
+                    include: { box: true }
+                }
             }
         });
-        if (!diarioExistente) {
-            throw new Error(`Não foi encontrado nenhum Diário de Bordo registado hoje para o animal com ID: ${idAnimal}`);
-        }
-        return await prisma.diarioBordo.update({
-            where: {
-                idRegisto: diarioExistente.idRegisto
-            },
+    }
+    // Regista um check diário da veterinária
+    async registarCheckDiario(idAnimal, notas) {
+        // 1. Muda o boolean para true para desaparecer da lista de verificações
+        await prisma.animal.update({
+            where: { idAnimal },
+            data: { check: true }
+        });
+        // 2. CRIA um novo registo no diário de bordo com as notas
+        return await prisma.diarioBordo.create({
             data: {
-                descricao: `[CHECK VETERINÁRIO] ${notas}`
+                descricao: `[CHECK VETERINÁRIO] ${notas}`,
+                animalId: idAnimal
             }
         });
     }
     // Ativa quarentena para um animal
     async ativarQuarentena(idAnimal, motivo) {
-        // Primeira atualiza o estado do animal para quarentena
         const animalAtualizado = await prisma.animal.update({
             where: { idAnimal },
             data: { estado: 'Quarentena' }
         });
-        // Depois registra no diário
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const amanha = new Date(hoje);
-        amanha.setDate(amanha.getDate() + 1);
-        const diarioExistente = await prisma.diarioBordo.findFirst({
-            where: {
-                animalId: idAnimal,
-                timestamp: {
-                    gte: hoje,
-                    lt: amanha
-                }
-            },
-            orderBy: {
-                timestamp: 'desc'
-            }
-        });
-        if (!diarioExistente) {
-            throw new Error(`Não foi encontrado nenhum Diário de Bordo registado hoje para o animal com ID: ${idAnimal}`);
-        }
-        await prisma.diarioBordo.update({
-            where: {
-                idRegisto: diarioExistente.idRegisto
-            },
+        // Regista o alerta no diário
+        await prisma.diarioBordo.create({
             data: {
-                descricao: `🚨 [QUARENTENA] ${motivo}`
+                descricao: `🚨 [QUARENTENA] ${motivo}`,
+                animalId: idAnimal
             }
         });
         return animalAtualizado;
     }
     // Desativa quarentena
     async desativarQuarentena(idAnimal) {
-        return await prisma.animal.update({
+        const animalAtualizado = await prisma.animal.update({
             where: { idAnimal },
             data: { estado: 'Saudavel' }
         });
+        // Regista a alta no diário
+        await prisma.diarioBordo.create({
+            data: {
+                descricao: `✅ [ALTA MÉDICA] O animal foi retirado da quarentena.`,
+                animalId: idAnimal
+            }
+        });
+        return animalAtualizado;
     }
     // Lista cães em quarentena
     async listarEmQuarentena() {
@@ -94,58 +120,13 @@ class PrescricaoDAO {
             }
         });
     }
-    // Busca cães que estão hospedados (CheckIn) e ainda não foram verificados hoje
-    async listarCaesParaVerificar() {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const amanha = new Date(hoje);
-        amanha.setDate(amanha.getDate() + 1);
-        // Cães hospedados
-        const caesHospedados = await prisma.animal.findMany({
-            where: {
-                reservas: {
-                    some: {
-                        estado: 'CheckIn',
-                        dataEntrada: { lt: amanha },
-                        dataSaida: { gt: hoje }
-                    }
-                }
-            },
-            include: {
-                tutor: { include: { utilizador: true } },
-                reservas: {
-                    where: {
-                        estado: 'CheckIn',
-                        dataEntrada: { lt: amanha },
-                        dataSaida: { gt: hoje }
-                    },
-                    include: { box: true }
-                },
-                diarioBordo: {
-                    where: {
-                        timestamp: { gte: hoje, lt: amanha },
-                        descricao: { contains: 'CHECK VETERINÁRIO' }
-                    }
-                }
-            }
-        });
-        // Filtra apenas os que ainda não têm check hoje
-        return caesHospedados.filter(cao => cao.diarioBordo.length === 0);
-    }
     // Verifica se um animal já foi verificado hoje
     async verificarSeJaFoiCheckHoje(idAnimal) {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const amanha = new Date(hoje);
-        amanha.setDate(amanha.getDate() + 1);
-        const check = await prisma.diarioBordo.findFirst({
-            where: {
-                animalId: idAnimal,
-                timestamp: { gte: hoje, lt: amanha },
-                descricao: { contains: 'CHECK VETERINÁRIO' }
-            }
+        const animal = await prisma.animal.findUnique({
+            where: { idAnimal },
+            select: { check: true }
         });
-        return !!check;
+        return animal?.check ?? false;
     }
 }
 exports.PrescricaoDAO = PrescricaoDAO;

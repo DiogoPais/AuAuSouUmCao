@@ -77,6 +77,9 @@ class GestorHotelFacade {
     async prescreverMedicacao(dados) {
         return await this.gestClinica.prescreverMedicacao(dados);
     }
+    async listarStock() {
+        return await this.gestClinica.listarStockCompleto();
+    }
     // ==========================================
     // DELEGAÇÃO: VETERINÁRIA
     // ==========================================
@@ -97,6 +100,9 @@ class GestorHotelFacade {
     }
     async verificarSeJaFoiCheckHoje(idAnimal) {
         return await this.gestClinica.verificarSeJaFoiCheckHoje(idAnimal);
+    }
+    async listarPrescricoesAnimal(animalId) {
+        return await this.gestClinica.listarPrescricoesAnimal(animalId);
     }
     // ==========================================
     // DELEGAÇÃO: TAREFAS E FUNCIONÁRIOS

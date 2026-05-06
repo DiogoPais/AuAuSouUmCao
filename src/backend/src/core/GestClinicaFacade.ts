@@ -17,7 +17,7 @@ export class GestClinicaFacade {
   // PRESCRIÇÃO E STOCK
   // ==========================================
   async prescreverMedicacao(dadosPrescricao: any) {
-    // dadosPrescricao = { animalId, funcionarioId, linhas: [{ medicamentoId, dosagem, frequencia }] }
+    // dadosPrescricao = { animalId, funcionarioId (opcional), linhas: [{ medicamentoId, dosagem, frequencia }] }
     
     if (!dadosPrescricao.linhas || dadosPrescricao.linhas.length === 0) {
       throw new Error("A prescrição deve conter pelo menos um medicamento.");
@@ -27,6 +27,15 @@ export class GestClinicaFacade {
       if (linha.dosagem <= 0) {
         throw new Error("A dosagem clínica deve ser superior a zero.");
       }
+    }
+
+    // Se não houver funcionarioId, busca o primeiro funcionário Vet da BD
+    if (!dadosPrescricao.funcionarioId) {
+      const funcionarioDefault = await this.prescricaoDAO.buscarPrimeiroFuncionarioVet();
+      if (!funcionarioDefault) {
+        throw new Error("Nenhum veterinário disponível para prescrição.");
+      }
+      dadosPrescricao.funcionarioId = funcionarioDefault.idFuncionario;
     }
 
     // 1. Criar a Prescrição (O DAO trata do Nested Write)
@@ -84,5 +93,9 @@ export class GestClinicaFacade {
 
   async verificarSeJaFoiCheckHoje(idAnimal: string) {
     return await this.prescricaoDAO.verificarSeJaFoiCheckHoje(idAnimal);
+  }
+
+  async listarPrescricoesAnimal(animalId: string) {
+    return await this.prescricaoDAO.findByAnimal(animalId);
   }
 }

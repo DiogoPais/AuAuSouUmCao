@@ -15,13 +15,15 @@ const transporter = nodemailer_1.default.createTransport({
         pass: process.env.EMAIL_PASS,
     },
 });
-const sendEmail = async (to, subject, text) => {
+const sendEmail = async (to, subject, text, html) => {
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to,
         subject,
-        text,
+        text, // O texto simples fica como plano B (fallback) caso o email do cliente não suporte HTML
+        html: html || text, // Se passares HTML, ele usa o HTML!
     };
+    console.log(`Enviando email para ${to} com assunto "${subject}" e texto "${text}"`);
     await transporter.sendMail(mailOptions);
 };
 exports.sendEmail = sendEmail;
