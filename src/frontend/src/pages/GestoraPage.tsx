@@ -1,299 +1,281 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { FileText, Download, DollarSign, Activity, Printer, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
-import './GestoraPage.css';
+import './GestoraPage.css'; 
 
-type Tab = 'dashboard' | 'calendario' | 'stock';
-type StockView = 'main' | 'atual' | 'historico';
-
-interface Reserva {
-  idReserva: string;
-  dataEntrada: string;
-  dataSaida: string;
-  estado: string;
+interface Fatura {
+  idFaturas: string;
+  nifCliente: string;
+  valorTotal: number;
+  documento: string;
+  metodoPagamento: string;
 }
 
-interface StockItem {
-  idItem: string;
-  nome: string;
-  tipo: string;
-  quantidade: number;
-  dataAtualizacao?: string;
+interface Log {
+  idRegisto: string;
+  descricao: string;
+  timestamp: string;
+  animalId: string;
+  animal: { nome: string };
 }
 
 const GestoraPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [stockView, setStockView] = useState<StockView>('main');
-  const [quarentenaAtiva, setQuarentenaAtiva] = useState(false);
-  
-  // DADOS REAIS DA BD
-  const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Filtros de Stock
-  const [filtroRacao, setFiltroRacao] = useState(false);
-  const [filtroMed, setFiltroMed] = useState(false);
-  const [filtroEmFalta, setFiltroEmFalta] = useState(false);
-  const [ordemData, setOrdData] = useState<'A' | 'D'>('D'); // Ascendente ou Descendente
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  const CAPACIDADE_MAXIMA = 30; // Ajusta para o limite real de boxes do vosso hotel
-
-  const admin = {
+  const gestora = {
     nome: localStorage.getItem('user_nome') || 'Gestora',
-    perfil: 'Admin',
+    nif: localStorage.getItem('user_nif') || '---',
+    telemovel: localStorage.getItem('user_telemovel') || '---',
+    perfil: localStorage.getItem('role') || 'Gestora',
   };
 
+  const [activeTab, setActiveTab] = useState<'FINANCAS' | 'LOGS'>('FINANCAS');
+  const [faturas, setFaturas] = useState<Fatura[]>([]);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
   useEffect(() => {
-    const fetchDados = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        // Vai buscar as reservas e o stock à API
-        const [resReservas, resStock] = await Promise.all([
-          axios.get(`${API_URL}/api/reservas`),
-          axios.get(`${API_URL}/api/stock`).catch(() => ({ data: [] })) // Previne erro caso a rota ainda não exista
+        const [resFaturas, resLogs] = await Promise.all([
+          axios.get(`${API_URL}/api/faturas`),
+          axios.get(`${API_URL}/api/logs`)
         ]);
-        setReservas(resReservas.data);
-        setStock(resStock.data);
+        setFaturas(resFaturas.data);
+        setLogs(resLogs.data);
       } catch (err) {
-        console.error("Erro ao carregar dados reais:", err);
+        console.error('Erro ao carregar dados da gestora:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchDados();
-  }, [API_URL]);
+    fetchData();
+  }, []);
 
-  // =====================================
-  // RENDERIZAR: DASHBOARD (Com alertas dinâmicos)
-  // =====================================
-  const renderDashboard = () => {
-    const itensEmFalta = stock.filter(s => s.quantidade < 5).length;
+  // ==========================================
+  // MÉTRICAS FINANCEIRAS
+  // ==========================================
+  const totalFaturado = faturas.reduce((acc, f) => acc + f.valorTotal, 0);
+  const totalIVA = totalFaturado * 0.23; // Estimativa de IVA (23%) do total bruto
+  const receitaLiquida = totalFaturado - totalIVA;
 
-    return (
-      <>
-        <div className="dashboard-alert-card">
-          <div className="alert-info">
-            <h3>Verificar Calendario para caso de Overbooking</h3>
-            <p>Mantenha-se atento à lotação máxima das boxes nos próximos dias.</p>
-          </div>
-          <button className="btn-alerta-neutro" onClick={() => setActiveTab('calendario')}>
-            Ir para o Calendario
-          </button>
-        </div>
-
-        {itensEmFalta > 0 && (
-          <div className="dashboard-alert-card">
-            <div className="alert-info">
-              <h3>Alerta de Stock Crítico!</h3>
-              <p>Existem {itensEmFalta} itens em falta ou a acabar. Devemos encomendar.</p>
-            </div>
-            <button className="btn-alerta-urgente" onClick={() => { setActiveTab('stock'); setStockView('atual'); setFiltroEmFalta(true); }}>
-              Ir para Stock
-            </button>
-          </div>
-        )}
-
-        <div className="dashboard-footer">
-          <button 
-            className="btn-quarentena-toggle"
-            onClick={() => setQuarentenaAtiva(!quarentenaAtiva)}
-          >
-            Ativar Modo Quarentena = {quarentenaAtiva ? 'Ativado' : 'Desativado'}
-          </button>
-        </div>
-      </>
-    );
-  };
-
-  // =====================================
-  // RENDERIZAR: CALENDÁRIO DINÂMICO
-  // =====================================
-  const renderCalendario = () => {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = hoje.getMonth();
-    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
-    const dias = Array.from({ length: diasNoMes }, (_, i) => i + 1);
-
-    return (
-      <div className="calendario-wrapper">
-        <div className="cal-header">
-          <span>Dom</span><span>Seg</span><span>Ter</span>
-          <span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
-        </div>
-        <div className="cal-grid">
-          {dias.map(dia => {
-            const dataAtual = new Date(ano, mes, dia);
-            dataAtual.setHours(0, 0, 0, 0);
-
-            // CALCULAR OCUPAÇÃO REAL DESTE DIA:
-            const ocupacaoDia = reservas.filter(r => {
-              if (r.estado === 'Cancelada' || r.estado === 'CheckOut') return false;
-              const entrada = new Date(r.dataEntrada);
-              const saida = new Date(r.dataSaida);
-              entrada.setHours(0, 0, 0, 0);
-              saida.setHours(23, 59, 59, 999);
-              return dataAtual >= entrada && dataAtual <= saida;
-            }).length;
-
-            const isLotado = ocupacaoDia >= CAPACIDADE_MAXIMA;
-            
-            return (
-              <div key={dia} className={`cal-cell ${isLotado ? 'lotado' : 'ok'}`}>
-                <span className="dia-num">{dia}</span>
-                <span className="capacidade">{ocupacaoDia}/{CAPACIDADE_MAXIMA}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // =====================================
-  // RENDERIZAR: STOCK DINÂMICO
-  // =====================================
-  const renderStock = () => {
-    // Filtramos o array de stock real baseado nos toggles
-    let stockFiltrado = stock;
+  // ==========================================
+  // EXPORTAÇÃO CSV
+  // ==========================================
+  const exportarCSV = () => {
+    let csvContent = "Data,Hora,Animal,Incidente/Descrição\n";
     
-    if (filtroRacao) stockFiltrado = stockFiltrado.filter(s => s.tipo === 'Racao');
-    if (filtroMed) stockFiltrado = stockFiltrado.filter(s => s.tipo === 'Medicamento');
-    if (filtroEmFalta) stockFiltrado = stockFiltrado.filter(s => s.quantidade < 5); // Exemplo: < 5 é falta
+    logs.forEach(log => {
+      const data = new Date(log.timestamp).toLocaleDateString('pt-PT');
+      const hora = new Date(log.timestamp).toLocaleTimeString('pt-PT');
+      const descSegura = log.descricao.replace(/,/g, ' '); 
+      
+      csvContent += `${data},${hora},${log.animal?.nome || 'N/A'},"${descSegura}"\n`;
+    });
 
-    if (stockView === 'historico') {
-      stockFiltrado = [...stockFiltrado].sort((a, b) => {
-        if (ordemData === 'A') return a.quantidade - b.quantidade;
-        return b.quantidade - a.quantidade;
-      });
-    }
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Logs_Auditoria_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-    if (stockView === 'main') {
-      return (
-        <div className="stock-main-card">
-          <div className="stock-section" style={{ borderBottom: '1px solid #CCCCCC' }}>
-            <div className="stock-section-left">
-              <h3>Pedido de Ração Automático:</h3>
-              <p>O sistema cruza as necessidades com os níveis atuais.</p>
-            </div>
-            <div className="stock-section-right">
-              <button className="btn-stock">Aceitar</button>
-            </div>
-          </div>
-          
-          <div className="stock-section">
-            <div className="stock-section-left"><h3 style={{fontWeight: 'normal'}}>Obter Stock Atualmente no Hotel</h3></div>
-            <div className="stock-section-right">
-              <button className="btn-stock" onClick={() => setStockView('atual')}>Ver</button>
-            </div>
-          </div>
+  // ==========================================
+  // GERAÇÃO DE PDF
+  // ==========================================
+  const imprimirRelatorioPDF = () => {
+    window.print();
+  };
 
-          <div className="stock-section">
-            <div className="stock-section-left"><h3 style={{fontWeight: 'normal'}}>Obter Dados de historico de Stock</h3></div>
-            <div className="stock-section-right">
-              <button className="btn-stock" onClick={() => setStockView('historico')}>Ver</button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
-      <div className="stock-view-container">
-        {/* FILTROS LATERAIS */}
-        <div className="stock-filters">
-          <h4>Filtros:</h4>
-          <div className="filter-item">
-            <span>Ração</span>
-            <div className="toggle-switch" style={{ background: filtroRacao ? '#7DDFD3' : '#CCC' }} onClick={() => setFiltroRacao(!filtroRacao)}></div>
-          </div>
-          <div className="filter-item">
-            <span>Medicamentos</span>
-            <div className="toggle-switch" style={{ background: filtroMed ? '#7DDFD3' : '#CCC' }} onClick={() => setFiltroMed(!filtroMed)}></div>
-          </div>
-          
-          <div style={{height: '10px'}}></div>
-          
-          {stockView === 'atual' ? (
-            <div className="filter-item">
-              <span>Em Falta</span>
-              <div className="toggle-switch" style={{ background: filtroEmFalta ? '#E74C3C' : '#CCC' }} onClick={() => setFiltroEmFalta(!filtroEmFalta)}></div>
-            </div>
-          ) : (
-            <div className="filter-item">
-              <span>Ord Qtd</span>
-              <div className="ord-buttons">
-                <button className={`btn-ord ${ordemData === 'A' ? 'ativo' : 'inativo'}`} onClick={() => setOrdData('A')}>A</button>
-                <button className={`btn-ord ${ordemData === 'D' ? 'ativo' : 'inativo'}`} onClick={() => setOrdData('D')}>D</button>
-              </div>
-            </div>
-          )}
-          
-          <button className="btn-stock" style={{marginTop: '20px'}} onClick={() => { setStockView('main'); setFiltroEmFalta(false); setFiltroMed(false); setFiltroRacao(false); }}>Voltar</button>
-        </div>
-        
-        {/* LISTA DINÂMICA DE STOCK */}
-        <div className="stock-list">
-          {stockFiltrado.length > 0 ? stockFiltrado.map((item, idx) => (
-            <div className="stock-item" key={idx}>
-              <div className="stock-section-left">
-                <h3>{item.nome} {stockView === 'historico' && ' (Histórico)'}</h3>
-                <p>Quantidade: {item.quantidade} {item.tipo === 'Racao' ? 'kg' : 'un'}</p>
-              </div>
-              {item.quantidade < 5 && stockView === 'atual' && <div className="badge-falta">Em Falta!!</div>}
-              {stockView === 'atual' && <button className="btn-stock">Pedir</button>}
-            </div>
-          )) : (
-            <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>Nenhum item encontrado.</p>
-          )}
-        </div>
+      <div className="gestora-page-container">
+        <Header userData={gestora} />
+        <div style={{ textAlign: 'center', padding: '50px' }}>A carregar métricas...</div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="gestora-page-container">
-      <Header userData={admin} />
+    <div className="gestora-page-container" style={{ minHeight: '100vh', backgroundColor: '#f4f7f6', paddingBottom: '40px' }}>
       
-      {/* BARRA DE NAVEGAÇÃO SUPERIOR - VETERINÁRIA REMOVIDA! */}
-      <div className="gestora-navbar">
-        <button 
-          className={`gestora-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('dashboard'); setStockView('main'); }}
-        >
-          DashBoard
-        </button>
-        <button 
-          className={`gestora-tab ${activeTab === 'calendario' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('calendario'); setStockView('main'); }}
-        >
-          Calendario
-        </button>
-        <button 
-          className={`gestora-tab ${activeTab === 'stock' ? 'active' : ''}`}
-          onClick={() => setActiveTab('stock')}
-        >
-          Stock
-        </button>
+      <div className="no-print">
+        <Header userData={gestora} />
       </div>
 
-      <main className="gestora-content">
-        {loading ? <p style={{textAlign: 'center', marginTop: '50px'}}>A carregar dados do Hotel...</p> : (
-          <>
-            {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'calendario' && renderCalendario()}
-            {activeTab === 'stock' && renderStock()}
-          </>
+      {/* CABEÇALHO SÓ VISÍVEL NO PDF */}
+      <div className="print-only" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>
+        <h2>Relatório de Incidentes e Auditoria - Hotel Canino</h2>
+        <p>Data de Emissão: {new Date().toLocaleDateString('pt-PT')}</p>
+        <hr />
+      </div>
+
+      <main className="gestora-main" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+        
+        <div className="no-print" style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
+          <button 
+            style={{ padding: '10px 20px', background: activeTab === 'FINANCAS' ? '#7DDFD3' : '#eee', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => setActiveTab('FINANCAS')}
+          >
+            <DollarSign size={18} /> Dashboard Financeiro
+          </button>
+          <button 
+            style={{ padding: '10px 20px', background: activeTab === 'LOGS' ? '#7DDFD3' : '#eee', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => setActiveTab('LOGS')}
+          >
+            <Activity size={18} /> Auditoria e Logs
+          </button>
+        </div>
+
+        {activeTab === 'FINANCAS' && (
+          <section className="dashboard-section no-print">
+            <h2 style={{ marginBottom: '20px', color: '#333' }}>Visão Geral Financeira</h2>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '5px solid #28a745' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Faturação Bruta Total</p>
+                <h3 style={{ margin: '5px 0 0 0', fontSize: '28px', color: '#333' }}>{totalFaturado.toFixed(2)} €</h3>
+              </div>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '5px solid #17a2b8' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Receita Líquida Estimada</p>
+                <h3 style={{ margin: '5px 0 0 0', fontSize: '28px', color: '#333' }}>{receitaLiquida.toFixed(2)} €</h3>
+              </div>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '5px solid #ffc107' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Imposto (IVA 23%)</p>
+                <h3 style={{ margin: '5px 0 0 0', fontSize: '28px', color: '#333' }}>{totalIVA.toFixed(2)} €</h3>
+              </div>
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '5px solid #6c757d' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Faturas Emitidas</p>
+                <h3 style={{ margin: '5px 0 0 0', fontSize: '28px', color: '#333' }}>{faturas.length}</h3>
+              </div>
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '20px' }}>
+              <h3 style={{ margin: '0 0 15px 0' }}><FileText size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Histórico de Faturação</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ background: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Documento</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>NIF Cliente</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Método Pagamento</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Valor Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {faturas.length > 0 ? faturas.map(f => (
+                    <tr key={f.idFaturas} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px', color: '#0066cc', fontWeight: 'bold' }}>{f.documento}</td>
+                      <td style={{ padding: '12px' }}>{f.nifCliente}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ background: '#e9ecef', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>{f.metodoPagamento}</span>
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 'bold' }}>{f.valorTotal.toFixed(2)} €</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhuma fatura emitida ainda.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
+
+        {activeTab === 'LOGS' && (
+          <section className="logs-section">
+            <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: '#333' }}>Auditoria de Operações e Incidentes</h2>
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={exportarCSV}
+                  style={{ padding: '8px 15px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Download size={16} /> Exportar CSV
+                </button>
+                <button 
+                  onClick={imprimirRelatorioPDF}
+                  style={{ padding: '8px 15px', background: '#17a2b8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Printer size={16} /> Gerar Relatório PDF
+                </button>
+              </div>
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '20px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                <thead style={{ background: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Data e Hora</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Animal Relacionado</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Descrição do Log / Incidente</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.length > 0 ? logs.map(log => {
+                    const isAlerta = log.descricao.includes('🚨') || log.descricao.includes('[CHECK');
+                    
+                    return (
+                      <tr key={log.idRegisto} style={{ borderBottom: '1px solid #eee', backgroundColor: isAlerta ? '#fffaf0' : 'transparent' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                          {new Date(log.timestamp).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{log.animal?.nome || 'Sistema'}</td>
+                        <td style={{ padding: '12px', color: isAlerta ? '#d39e00' : '#333' }}>
+                          {log.descricao}
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhum log registado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* BOTÃO DE VOLTAR */}
+        <div className="no-print" style={{ marginTop: '30px' }}>
+          <button 
+            onClick={() => window.history.back()}
+            style={{ 
+              padding: '10px 20px', 
+              background: '#6c757d', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontWeight: 'bold',
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#5a6268'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#6c757d'}
+          >
+            <ArrowLeft size={18} /> Voltar ao Menu
+          </button>
+        </div>
+
       </main>
 
-      <button className="btn-logout-global" onClick={() => navigate('/admin-gateway')}>
-        Voltar à Gateway
-      </button>
+      <style>{`
+        @media print {
+          body { background-color: white !important; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .gestora-page-container { background: transparent; }
+          table { border: 1px solid #ddd; }
+          th, td { border: 1px solid #ddd !important; }
+          @page { margin: 1cm; }
+        }
+      `}</style>
     </div>
   );
 };

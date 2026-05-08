@@ -61,4 +61,11 @@ export class UtilizadorDAO {
       }
     });
   }
+
+  // Busca todos os funcionários de um determinado perfil (usado para o Round-Robin do Staff)
+  async findByPerfil(perfil: any) {
+    return await prisma.funcionario.findMany({
+      where: { perfil: perfil }
+    });
+  }
 }

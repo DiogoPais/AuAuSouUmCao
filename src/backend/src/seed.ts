@@ -4,13 +4,13 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🚀 A atualizar contas, criar animais e a semear stock...');
+  console.log('🚀 A atualizar contas, criar animais e a semear as 40 novas boxes...');
 
   const saltRounds = 10;
   const hashedPass = await bcrypt.hash('password123', saltRounds);
 
   // ==========================================
-  // 1. EQUIPA DO HOTEL
+  // 1. EQUIPA DO HOTEL E CLIENTE (O upsert não apaga nada, é seguro!)
   // ==========================================
   await prisma.utilizador.upsert({
     where: { email: 'diana@auau.pt' },
@@ -48,9 +48,6 @@ async function main() {
     }
   });
 
-  // ==========================================
-  // 2. CLIENTE E ANIMAL DE TESTE
-  // ==========================================
   await prisma.utilizador.upsert({
     where: { email: 'tutor@auau.pt' },
     update: { password: hashedPass },
@@ -58,12 +55,6 @@ async function main() {
       nome: 'João Tutor', email: 'tutor@auau.pt', password: hashedPass,
       tutor: { create: { nif: '123456789', contacto: '912345678' } }
     }
-  });
-
-  const box = await prisma.box.upsert({
-    where: { numero: 1 },
-    update: {},
-    create: { numero: 1, tamanho: 2, ocupacao: 0, estado: 'Higienizada' }
   });
 
   const animal = await prisma.animal.upsert({
@@ -76,7 +67,30 @@ async function main() {
   });
 
   // ==========================================
-  // 3. RESERVA (Para o Calendário e Cron Job)
+  // 2. A MAGIA DAS 40 BOXES (Sem apagar o passado)
+  // ==========================================
+  console.log('📦 A configurar as regras das 40 boxes...');
+
+  const boxes = [];
+  for (let i = 1; i <= 20; i++) boxes.push({ numero: i, tipo: 'Não-Reativo', estado: 'Limpa' });
+  for (let i = 21; i <= 30; i++) boxes.push({ numero: i, tipo: 'Reativo', estado: 'Limpa' });
+  for (let i = 31; i <= 40; i++) boxes.push({ numero: i, tipo: 'Quarentena', estado: 'Limpa' });
+
+  for (const b of boxes) {
+    await prisma.box.upsert({
+      where: { numero: b.numero },
+      update: { tipo: b.tipo, estado: b.estado }, // Se já existir (ex: Box 1), apenas atualiza para o novo formato!
+      create: b,                                  // Se não existir, cria de raiz.
+    });
+  }
+
+  // Se por acaso existirem boxes antigas com número superior a 40 (que já não queremos), apagamos essas.
+  await prisma.box.deleteMany({
+    where: { numero: { gt: 40 } }
+  });
+
+  // ==========================================
+  // 3. RESERVA DE TESTE
   // ==========================================
   const reservaExistente = await prisma.reserva.findFirst({ where: { animalId: animal.idAnimal } });
   if (!reservaExistente) {
@@ -85,39 +99,34 @@ async function main() {
     await prisma.reserva.create({
       data: {
         dataEntrada: new Date(), dataSaida: amanha, valor: 100, estado: 'CheckIn',
-        animalId: animal.idAnimal, boxNumero: box.numero
+        animalId: animal.idAnimal, boxNumero: 1 // Forçamos a Box 1 para o teste
       }
     });
   }
 
   // ==========================================
-  // 4. STOCK: RAÇÃO E MEDICAMENTOS
+  // 4. STOCK (Seguro e à prova de erros TypeScript!)
   // ==========================================
-  // Limpamos o stock existente para evitar duplicados caso corras o seed várias vezes
-  await prisma.stock.deleteMany();
+  console.log('🛒 A verificar e a semear o stock...');
 
-  // Ração Saudável (Sem alerta)
-  await prisma.stock.create({
-    data: {
-      nome: 'Ração Premium Adultos', quantidade: 50, limiteAlerta: 10,
-      racao: { create: { marca: 'Royal Canin' } }
+  // Função auxiliar para contornar a falta do @unique no campo 'nome'
+  const semearStockSeguro = async (nomeItem: string, dadosCreate: any) => {
+    const itemExiste = await prisma.stock.findFirst({ where: { nome: nomeItem } });
+    if (!itemExiste) {
+      await prisma.stock.create({ data: dadosCreate });
     }
+  };
+
+  await semearStockSeguro('Ração Premium Adultos', { 
+    nome: 'Ração Premium Adultos', quantidade: 50, limiteAlerta: 10, racao: { create: { marca: 'Royal Canin' } } 
   });
 
-  // Ração Baixa (Vai aparecer a VERMELHO na Gestora!)
-  await prisma.stock.create({
-    data: {
-      nome: 'Ração Gastrointestinal', quantidade: 3, limiteAlerta: 5,
-      racao: { create: { marca: 'Purina Pro Plan' } }
-    }
+  await semearStockSeguro('Ração Gastrointestinal', { 
+    nome: 'Ração Gastrointestinal', quantidade: 3, limiteAlerta: 5, racao: { create: { marca: 'Purina Pro Plan' } } 
   });
 
-  // Medicamento
-  await prisma.stock.create({
-    data: {
-      nome: 'Flagyl 250mg', quantidade: 20, limiteAlerta: 5,
-      medicamento: { create: { concentracao: 250 } }
-    }
+  await semearStockSeguro('Flagyl 250mg', { 
+    nome: 'Flagyl 250mg', quantidade: 20, limiteAlerta: 5, medicamento: { create: { concentracao: 250 } } 
   });
 
   console.log('✅ Base de Dados atualizada, segura e semeada com sucesso!');

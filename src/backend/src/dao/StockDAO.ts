@@ -30,4 +30,11 @@ export class StockDAO {
       include: { medicamento: true }
     });
   }
+
+  // 👇 NOVA FUNÇÃO ADICIONADA PARA O ALGORITMO DA RAÇÃO 👇
+  async findById(idItem: string) {
+    return await prisma.stock.findUnique({
+      where: { idItem: idItem }
+    });
+  }
 }

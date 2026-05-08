@@ -139,17 +139,50 @@ export class PrescricaoDAO {
     });
   }
 
-  // Ativa quarentena para um animal
   async ativarQuarentena(idAnimal: string, motivo: string) {
+    // 1. Muda o estado clínico
     const animalAtualizado = await prisma.animal.update({
       where: { idAnimal },
       data: { estado: 'Quarentena' }
     });
 
-    // Regista o alerta no diário
+    // 2. PROTOCOLO DE ISOLAMENTO: Realocar a reserva ativa para uma Box de Quarentena
+    const reservaAtiva = await prisma.reserva.findFirst({
+      where: { animalId: idAnimal, estado: 'CheckIn' },
+      include: { box: true }
+    });
+
+    if (reservaAtiva && reservaAtiva.box.tipo !== 'Quarentena') {
+      // Procura uma box de Quarentena Limpa e Vazia
+      const boxQuarentena = await prisma.box.findFirst({
+        where: { tipo: 'Quarentena', estado: 'Limpa' },
+        orderBy: { numero: 'asc' }
+      });
+
+      if (boxQuarentena) {
+        // Suja a Box antiga onde o cão infetado esteve
+        await prisma.box.update({
+          where: { numero: reservaAtiva.boxNumero },
+          data: { estado: 'Suja' }
+        });
+
+        // Transfere o cão e marca a nova box como "Ocupada" pela Quarentena
+        await prisma.reserva.update({
+          where: { idReserva: reservaAtiva.idReserva },
+          data: { boxNumero: boxQuarentena.numero }
+        });
+
+        await prisma.box.update({
+          where: { numero: boxQuarentena.numero },
+          data: { estado: 'Ocupada' }
+        });
+      }
+    }
+
+    // 3. Regista o alerta
     await prisma.diarioBordo.create({
       data: {
-        descricao: `🚨 [QUARENTENA] ${motivo}`,
+        descricao: `🚨 [QUARENTENA] ${motivo}. Protocolo de Isolamento ativado.`,
         animalId: idAnimal
       }
     });

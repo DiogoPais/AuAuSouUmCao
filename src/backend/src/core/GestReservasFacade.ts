@@ -1,72 +1,188 @@
 import { ReservaDAO } from '../dao/ReservaDAO';
 import { AnimalDAO } from '../dao/AnimalDAO';
+import { UtilizadorDAO } from '../dao/UtilizadorDAO'; 
+import { StockDAO } from '../dao/StockDAO';           
+import { FaturaDAO } from '../dao/FaturaDAO'; // NOVO: Para emitirmos faturas
 import { EstadoReserva } from '@prisma/client';
 
 export class GestReservasFacade {
   private reservaDAO: ReservaDAO;
   private animalDAO: AnimalDAO;
+  private utilizadorDAO: UtilizadorDAO;
+  private stockDAO: StockDAO;
+  private faturaDAO: FaturaDAO;
 
   constructor() {
     this.reservaDAO = new ReservaDAO();
     this.animalDAO = new AnimalDAO();
+    this.utilizadorDAO = new UtilizadorDAO(); 
+    this.stockDAO = new StockDAO();           
+    this.faturaDAO = new FaturaDAO();
   }
 
   // ==========================================
-  // REGRAS DE NEGÓCIO: RESERVAS E OVERBOOKING
+  // REGRAS DE NEGÓCIO: RESERVAS E TAREFAS
   // ==========================================
 
-  async criarReserva(dadosReserva: any, servicos: any[]) {
-    const { dataEntrada, dataSaida, animalId } = dadosReserva;
+  async criarReserva(dadosReserva: any, servicosAntigos?: any[]) {
+    // 1. Apanhar os dados
+    const { dataEntrada, dataSaida, banhos, tosquias, passeios, valor } = dadosReserva;
+    const animalId = dadosReserva.idAnimal || dadosReserva.animalId; 
+    
     const entrada = new Date(dataEntrada);
     const saida = new Date(dataSaida);
 
-    // Regra 1: Validação de Datas
     if (isNaN(entrada.getTime()) || isNaN(saida.getTime()) || saida <= entrada) {
       throw new Error("Datas inválidas. A data de saída deve ser posterior à entrada.");
     }
 
-    // Regra 2: Validar se o animal existe
     const animalExiste = await this.animalDAO.findByIdWithHistorial(animalId);
     if (!animalExiste) {
       throw new Error("Animal não encontrado na base de dados.");
     }
 
-    // Regra 3: Um animal não pode ter duas reservas ativas ao mesmo tempo
     const reservaAtiva = await this.reservaDAO.findReservaAtivaDoAnimal(animalId);
     if (reservaAtiva) {
       throw new Error(`Este animal já possui uma reserva ativa (${reservaAtiva.estado}).`);
     }
 
-    // Regra 4: ATRIBUIÇÃO AUTOMÁTICA DE BOX (com regra de reativos/não-reativos)
     const reatividade = animalExiste.reatividade || 'Não Reativo';
     const boxAtribuida = await this.reservaDAO.atribuirBoxAutomaticamente(reatividade, entrada, saida);
 
-    // Cálculo do valor total da reserva
-    const dias = (saida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24);
-    const precoEstadia = dias * 20; // 20€ por dia
-    const precoServicos = servicos.reduce((acc, s) => acc + (s.preco || 0), 0);
-    const valorTotal = precoEstadia + precoServicos;
+    // ==============================================================
+    // PASSO A: O GERADOR DE AGENDA AUTOMÁTICA
+    // ==============================================================
+    const servicosParaCriar: any[] = [];
+    const diasTotais = Math.ceil((saida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Se passou em todas as regras de segurança, mandamos o DAO gravar
-    dadosReserva.estado = 'Pendente';
-    dadosReserva.dataEntrada = entrada;
-    dadosReserva.dataSaida = saida;
-    dadosReserva.boxNumero = boxAtribuida; // ← BOX ATRIBUÍDA AUTOMATICAMENTE
-    dadosReserva.valor = valorTotal; // ← VALOR CALCULADO
+    let b = banhos || 0;
+    let t = tosquias || 0;
+    let p = passeios || 0;
+
+    for (let i = 0; i < diasTotais; i++) {
+      const dataAtual = new Date(entrada);
+      dataAtual.setDate(entrada.getDate() + i);
+
+      // Alimentação (19:00)
+      const dataComida = new Date(dataAtual);
+      dataComida.setHours(19, 0, 0, 0);
+      servicosParaCriar.push({ tipo: 'Alimentacao', data: dataComida, preco: 0 });
+
+      // Passeios (10:00)
+      if (p > 0) {
+        const dataPasseio = new Date(dataAtual);
+        dataPasseio.setHours(10, 0, 0, 0);
+        servicosParaCriar.push({ tipo: 'Passeio', data: dataPasseio, preco: 10 });
+        p--;
+      }
+
+      // Banhos (15:00)
+      if (b > 0) {
+        const dataBanho = new Date(dataAtual);
+        dataBanho.setHours(15, 0, 0, 0);
+        servicosParaCriar.push({ tipo: 'Grooming', descricao: 'Banho', data: dataBanho, preco: 20 });
+        b--;
+      }
+
+      // Tosquias (16:00)
+      if (t > 0) {
+        const dataTosquia = new Date(dataAtual);
+        dataTosquia.setHours(16, 0, 0, 0);
+        servicosParaCriar.push({ tipo: 'Grooming', descricao: 'Tosquia', data: dataTosquia, preco: 10 });
+        t--;
+      }
+    }
+
+    // ==============================================================
+    // PASSO B: DIVISÃO EQUITATIVA (ROUND-ROBIN)
+    // ==============================================================
+    const equipaStaff = await this.utilizadorDAO.findByPerfil('Staff');
     
-    return await this.reservaDAO.create(dadosReserva, servicos);
+    if (equipaStaff.length > 0 && servicosParaCriar.length > 0) {
+      let staffIndex = 0;
+      servicosParaCriar.forEach(servico => {
+        servico.funcionarioId = equipaStaff[staffIndex].idFuncionario;
+        staffIndex = (staffIndex + 1) % equipaStaff.length; 
+      });
+    }
+
+    const reservaFinal = {
+      animalId: animalId,
+      dataEntrada: entrada,
+      dataSaida: saida,
+      estado: 'Pendente',
+      boxNumero: boxAtribuida,
+      valor: valor
+    };
+    
+    return await this.reservaDAO.create(reservaFinal, servicosParaCriar);
   }
 
   async listarTodas() {
     return await this.reservaDAO.findAll();
   }
 
-  async confirmarCheckIn(idReserva: string) {
-    return await this.reservaDAO.updateEstado(idReserva, 'CheckIn');
+  // ==========================================
+  // RECEÇÃO: CHECK-IN E CHECK-OUT INTELIGENTE
+  // ==========================================
+
+  async confirmarCheckIn(idReserva: string, termosAceites: boolean) {
+    if (!termosAceites) {
+      throw new Error("Não é possível realizar o Check-in sem a aceitação obrigatória dos Termos de Responsabilidade.");
+    }
+    
+    // Chama o novo método que altera o estado e grava o termo!
+    return await this.reservaDAO.processarCheckInDB(idReserva); 
   }
 
-  async confirmarCheckOut(idReserva: string) {
-    return await this.reservaDAO.updateEstado(idReserva, 'CheckOut');
+  async processarCheckOutCompleto(idReserva: string, metodoPagamento: string) {
+    if (!metodoPagamento) throw new Error("É obrigatório selecionar um método de pagamento.");
+
+    const reserva = await this.reservaDAO.findByIdComAnimal(idReserva);
+    if (!reserva) throw new Error("Reserva não encontrada.");
+
+    const agora = new Date();
+    let valorFinal = reserva.valor;
+    let diasAtrasoOuAntecipacao = 0;
+
+    // Cálculos à Meia-Noite
+    const inicioReal = new Date(reserva.dataEntrada).setHours(0,0,0,0);
+    const fimPrevisto = new Date(reserva.dataSaida).setHours(0,0,0,0);
+    const saidaReal = agora.setHours(0,0,0,0);
+
+    const diasPrevistos = Math.max(1, Math.ceil((fimPrevisto - inicioReal) / (1000 * 60 * 60 * 24)));
+    const diasReais = Math.max(1, Math.ceil((saidaReal - inicioReal) / (1000 * 60 * 60 * 24)));
+
+    // REGRA DE NEGÓCIO: Recálculo de Preço Justo
+    if (diasReais > diasPrevistos) {
+      // ATRASO: Cobra +20€ por cada dia extra
+      diasAtrasoOuAntecipacao = diasReais - diasPrevistos;
+      valorFinal += (diasAtrasoOuAntecipacao * 20);
+    } 
+    else if (diasReais < diasPrevistos) {
+      // SAÍDA ANTECIPADA: Devolve 20€ por cada dia que o cão não usou!
+      diasAtrasoOuAntecipacao = diasPrevistos - diasReais;
+      valorFinal -= (diasAtrasoOuAntecipacao * 20);
+      
+      // Garantia que não devolvemos dinheiro de banhos já dados (Preço Mínimo)
+      if (valorFinal < 0) valorFinal = 0; 
+    }
+
+    const fatura = await this.faturaDAO.create({
+      nifCliente: reserva.animal.tutorNif,
+      valorTotal: valorFinal,
+      documento: `FAT-${Date.now()}-${metodoPagamento}.pdf`,
+      metodoPagamento: metodoPagamento
+    });
+
+    await this.reservaDAO.processarCheckOutDB(idReserva, valorFinal, fatura.idFaturas);
+
+    return {
+      fatura,
+      diasReais,
+      valorOriginal: reserva.valor,
+      valorFinal
+    };
   }
 
   async cancelarReserva(idReserva: string) {
@@ -77,8 +193,8 @@ export class GestReservasFacade {
     return await this.reservaDAO.delete(idReserva);
   }
 
-    // ==========================================
-  // GESTÃO DE TAREFAS (STAFF)
+  // ==========================================
+  // GESTÃO DE TAREFAS (STAFF E RAÇÃO)
   // ==========================================
   async listarTarefasDoDia() {
     return await this.reservaDAO.findTarefasDoDia();
@@ -89,6 +205,27 @@ export class GestReservasFacade {
   }
 
   async marcarTarefaConcluida(idServico: string) {
+    const servico = await this.reservaDAO.findById(idServico);
+    if (!servico) throw new Error("Tarefa não encontrada.");
+
+    if (servico.tipo === 'Alimentacao') {
+      const animal = servico.reserva?.animal;
+      
+      if (animal && animal.racaoId && animal.doseDiaria) {
+        const itemStock = await this.stockDAO.findById(animal.racaoId);
+        
+        if (itemStock) {
+          const novaQuantidade = itemStock.quantidade - animal.doseDiaria;
+          
+          if (novaQuantidade < 0) {
+            throw new Error(`Stock insuficiente de ração (${itemStock.nome}). Faltam ${Math.abs(novaQuantidade)}kg no armazém.`);
+          }
+          
+          await this.stockDAO.updateQuantidade(animal.racaoId, novaQuantidade);
+        }
+      }
+    }
+
     return await this.reservaDAO.marcarConcluida(idServico);
   }
 

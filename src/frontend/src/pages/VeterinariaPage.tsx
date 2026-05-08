@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { AlertCircle, CheckCircle, Plus, Check, XCircle, Clock, Save, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Plus, Check, XCircle, Clock, Save, Trash2, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
-import Footer from '../components/Footer';
 import './VeterinariaPage.css';
 
 interface Animal {
@@ -155,7 +154,7 @@ const VeterinariaPage: React.FC = () => {
       return;
     }
     setLinhasReceita([...linhasReceita, { ...linhaAtual }]);
-    setLinhaAtual({ medicamentoId: '', dosagem: '', frequencia: '', totalDoses: '' }); // Limpa form local
+    setLinhaAtual({ medicamentoId: '', dosagem: '', frequencia: '', totalDoses: '' });
   };
 
   const handleRemoverLinha = (index: number) => {
@@ -188,11 +187,9 @@ const VeterinariaPage: React.FC = () => {
       await axios.post(`${API_URL}/api/veterinaria/prescricao`, payload);
       alert('Receita gravada com sucesso! O stock foi descontado do total.');
       
-      // Limpar formulário
       setAnimalSelecionadoParaReceita('');
       setLinhasReceita([]);
       
-      // Atualizar tabelas
       const resStock = await axios.get(`${API_URL}/api/stock`);
       setMedicamentos(resStock.data.filter((item: any) => item.tipo === 'Medicamento'));
       await carregarTratamentosAtivos();
@@ -230,7 +227,7 @@ const VeterinariaPage: React.FC = () => {
   if (loading) return <div className="loading">Carregando...</div>;
 
   return (
-    <div className="veterinaria-page-container">
+    <div className="veterinaria-page-container" style={{ minHeight: '100vh', paddingBottom: '40px' }}>
       <Header userData={vet} />
 
       <main className="vet-main">
@@ -248,7 +245,6 @@ const VeterinariaPage: React.FC = () => {
 
         <div className="vet-content">
           
-          {/* TAB 1: VERIFICAR CÃES */}
           {tab === 'verificar' && (
             <section className="vet-section">
               <h2>Tarefas Diárias</h2>
@@ -282,7 +278,6 @@ const VeterinariaPage: React.FC = () => {
                 )}
               </div>
 
-              {/* PAINEL PADRÃO: CHECK DIÁRIO */}
               {caesSelecionado && !showModoQuarentena && !showModoPrescrever && (
                 <section className="verificacao-panel">
                   <div className="cao-detalhes">
@@ -316,7 +311,7 @@ const VeterinariaPage: React.FC = () => {
                       className="btn-finalizar-check"
                       onClick={() => {
                         setAnimalSelecionadoParaReceita(caesSelecionado.idAnimal);
-                        setTab('prescricao'); // SALTA LOGO PARA O SEPARADOR DA PRESCRIÇÃO
+                        setTab('prescricao'); 
                       }}
                       style={{ background: '#7DDFD3' }}
                     >
@@ -326,7 +321,6 @@ const VeterinariaPage: React.FC = () => {
                 </section>
               )}
 
-              {/* MODO QUARENTENA */}
               {caesSelecionado && showModoQuarentena && (
                 <section className="quarentena-panel">
                   <h3>🚨 Ativar Quarentena - {caesSelecionado.nome}</h3>
@@ -356,7 +350,6 @@ const VeterinariaPage: React.FC = () => {
             </section>
           )}
 
-          {/* TAB 2: QUARENTENA */}
           {tab === 'quarentena' && (
             <section className="vet-section">
               <h2>🚨 Cães em Quarentena</h2>
@@ -380,14 +373,12 @@ const VeterinariaPage: React.FC = () => {
             </section>
           )}
 
-          {/* TAB 3: PRESCRIÇÕES E TRATAMENTOS ATIVOS */}
           {tab === 'prescricao' && (
             <section className="vet-section">
               <h2>Tratamentos e Prescrições</h2>
               
               <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
                 
-                {/* COLUNA ESQUERDA: A NOVA RECEITA ACUMULATIVA */}
                 <div style={{ flex: 1, minWidth: '400px', background: '#f8f8f8', padding: '20px', borderRadius: '8px', border: '1px solid #7DDFD3' }}>
                   <h3 style={{ marginTop: 0, color: '#333' }}>Criar Receita Médica</h3>
                   
@@ -443,7 +434,6 @@ const VeterinariaPage: React.FC = () => {
                     + Adicionar à Lista
                   </button>
 
-                  {/* LISTA TEMPORÁRIA DA RECEITA */}
                   {linhasReceita.length > 0 && (
                     <div style={{ marginTop: '20px', background: 'white', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
                       <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Medicamentos na Receita:</h4>
@@ -462,7 +452,6 @@ const VeterinariaPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* COLUNA DIREITA: TABELA DE TRATAMENTOS ATIVOS */}
                 <div style={{ flex: 2, minWidth: '550px', background: '#fff', borderRadius: '8px', border: '1px solid #ddd', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ padding: '15px', borderBottom: '1px solid #ddd', background: '#f8f8f8', borderRadius: '8px 8px 0 0' }}>
                     <h3 style={{ margin: 0, color: '#333' }}>Tratamentos Ativos (Cães a Medicar)</h3>
@@ -482,7 +471,7 @@ const VeterinariaPage: React.FC = () => {
                       <tbody>
                         {tratamentosAtivos.length > 0 ? (
                           tratamentosAtivos.map((tratamento: any) => {
-                            const ultimoLog = tratamento.logsAdministracao?.[0]; // O log 0 é o mais recente porque ordenámos desc no DAO
+                            const ultimoLog = tratamento.logsAdministracao?.[0]; 
                             const totalDadas = tratamento.logsAdministracao?.length || 0;
                             const horasIntervalo = extrairHorasFrequencia(tratamento.frequencia);
                             
@@ -548,9 +537,37 @@ const VeterinariaPage: React.FC = () => {
               </div>
             </section>
           )}
+
+          {/* ========================================== */}
+          {/* BOTÃO DE VOLTAR - APENAS PARA A GESTORA    */}
+          {/* ========================================== */}
+          {vet.perfil === 'Admin' && (
+            <div style={{ marginTop: '30px', padding: '20px 0' }}>
+              <button 
+                onClick={() => window.history.back()}
+                style={{ 
+                  padding: '10px 20px', 
+                  background: '#6c757d', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  fontWeight: 'bold',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#5a6268'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#6c757d'}
+              >
+                <ArrowLeft size={18} /> Voltar ao Menu de Gestão
+              </button>
+            </div>
+          )}
+
         </div>
       </main>
-      <Footer />
     </div>
   );
 };

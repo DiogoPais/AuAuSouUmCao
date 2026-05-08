@@ -14,6 +14,9 @@ interface Animal {
   estado: string;
   tutorNif: string;
   boletimVacinasUrl?: string;
+  tipoTrela?: string; // NOVO
+  racaoId?: string;   // NOVO
+  doseDiaria?: number;// NOVO
 }
 
 interface Reserva {
@@ -40,6 +43,9 @@ const MarcacoesPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [mostrarNovoFormulario, setMostrarNovoFormulario] = useState(false);
 
+  // NOVO ESTADO: Para guardar as rações do armazém
+  const [racoes, setRacoes] = useState<any[]>([]);
+
   // Estados para novo animal
   const [vacinasFile, setVacinasFile] = useState<File | null>(null);
   const [racaCustomizada, setRacaCustomizada] = useState('');
@@ -54,23 +60,28 @@ const MarcacoesPage: React.FC = () => {
     nome: localStorage.getItem('user_nome') || 'Utilizador',
     nif: localStorage.getItem('user_nif') || '---',
     telemovel: localStorage.getItem('user_telemovel') || '---',
-    perfil: localStorage.getItem('role') || 'Tutor', // <-- ADICIONA ISTO
+    perfil: localStorage.getItem('role') || 'Tutor',
   };
 
-  // Carregar animais e reservas ao montar
+  // Carregar animais, reservas e stock ao montar
   useEffect(() => {
     const fetchDados = async () => {
       try {
         setLoading(true);
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         
-        // Buscar lista de animais
         const resAnimais = await axios.get(`${API_URL}/api/animais`);
         setAnimais(resAnimais.data);
 
-        // Buscar reservas
         const resReservas = await axios.get(`${API_URL}/api/reservas`);
         setReservas(resReservas.data);
+
+        // Buscar stock para preencher o dropdown de Ração
+        const resStock = await axios.get(`${API_URL}/api/stock`);
+        // Filtra apenas o que é ração (pela herança ou pelo nome)
+        const apenasRacoes = resStock.data.filter((item: any) => item.racao || item.nome.toLowerCase().includes('ração') || item.nome.toLowerCase().includes('racao'));
+        setRacoes(apenasRacoes);
+
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
       } finally {
@@ -91,17 +102,20 @@ const MarcacoesPage: React.FC = () => {
     estado: 'Saudavel',
     tutorNif: utilizador.nif,
     boletimVacinasUrl: '',
+    tipoTrela: 'Normal', // Valores por defeito
+    racaoId: '',
+    doseDiaria: 0,
   });
 
   const handleNovoAnimalChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setNovoAnimal({ ...novoAnimal, [name]: value });
+    setNovoAnimal({ ...novoAnimal, [name]: name === 'doseDiaria' ? Number(value) : value });
   };
 
   const adicionarAnimal = async () => {
-    if (!novoAnimal.nome || !novoAnimal.raca) {
+    if (!novoAnimal.nome || !novoAnimal.raca || !novoAnimal.reatividade) {
       alert('Por favor, preencha os campos obrigatórios!');
       return;
     }
@@ -117,7 +131,12 @@ const MarcacoesPage: React.FC = () => {
       formData.append('tutorNif', utilizador.nif);
       formData.append('microchip', novoAnimal.microchip || '');
       formData.append('estado', novoAnimal.estado);
-      formData.append('boletimVacinasUrl', novoAnimal.boletimVacinasUrl || '');
+      
+      // NOVOS CAMPOS ENVIADOS PARA O BACKEND
+      formData.append('tipoTrela', novoAnimal.tipoTrela || 'Normal');
+      if (novoAnimal.racaoId) formData.append('racaoId', novoAnimal.racaoId);
+      if (novoAnimal.doseDiaria) formData.append('doseDiaria', novoAnimal.doseDiaria.toString());
+
       if (vacinasFile) {
         formData.append('vacinasFile', vacinasFile);
       }
@@ -130,16 +149,10 @@ const MarcacoesPage: React.FC = () => {
       setAnimalSelecionado(res.data);
       setMostrarNovoFormulario(false);
       setNovoAnimal({
-        idAnimal: '',
-        nome: '',
-        raca: '',
-        reatividade: '',
-        microchip: '',
-        estado: 'Saudavel',
-        tutorNif: utilizador.nif,
-        boletimVacinasUrl: '',
+        idAnimal: '', nome: '', raca: '', reatividade: '', microchip: '', estado: 'Saudavel', tutorNif: utilizador.nif, boletimVacinasUrl: '', tipoTrela: 'Normal', racaoId: '', doseDiaria: 0
       });
       setRacaCustomizada('');
+      setVacinasFile(null);
     } catch (err) {
       console.error('Erro ao adicionar animal:', err);
       alert('Erro ao adicionar animal!');
@@ -154,10 +167,10 @@ const MarcacoesPage: React.FC = () => {
     const saida = new Date(dataSaida);
     const dias = (saida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24);
     
-    const precoEstadia = dias * 20; // 20€ por dia
-    const precoBanhos = banhos * 20; // 20€ por banho
-    const precoTosquias = tosquias * 10; // 10€ por tosquia
-    const precoPasseios = passeios * 10; // 10€ por passeio
+    const precoEstadia = dias * 20; 
+    const precoBanhos = banhos * 20; 
+    const precoTosquias = tosquias * 10; 
+    const precoPasseios = passeios * 10; 
     
     return precoEstadia + precoBanhos + precoTosquias + precoPasseios;
   };
@@ -199,8 +212,6 @@ const MarcacoesPage: React.FC = () => {
     }
   };
 
-
-
   const apagarReserva = async (idReserva: string) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -220,7 +231,6 @@ const MarcacoesPage: React.FC = () => {
 
   const reservasProprias = reservas.filter((r) => r.animal.tutorNif === utilizador.nif);
 
-  // Filtrar reservas no intervalo selecionado
   const countReservas = reservas.filter((r) => {
     const entrada = new Date(r.dataEntrada);
     const saida = new Date(r.dataSaida);
@@ -238,8 +248,8 @@ const MarcacoesPage: React.FC = () => {
     const entrada = new Date(dataEntrada);
     const saida = new Date(dataSaida);
     const dias = (saida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24);
-    return Math.ceil(dias); // Permitir 1 tosquia por dia
-};
+    return Math.ceil(dias); 
+  };
 
 
   if (loading) {
@@ -258,10 +268,9 @@ const MarcacoesPage: React.FC = () => {
 
       <main className="marcacoes-main">
         <div>
-        <h1 className="page-title">Minhas Marcações</h1>
-    </div>
+          <h1 className="page-title">Minhas Marcações</h1>
+        </div>
         <div className="marcacoes-content">
-          {/* PARTE 1: SELEÇÃO DE DATA */}
           <section className="secao-calendario">
             <h2>
               <Calendar size={24} /> Selecione a Data
@@ -271,22 +280,11 @@ const MarcacoesPage: React.FC = () => {
               <div className="date-range-row">
                 <div>
                   <label>Entrada</label>
-                  <input
-                    type="date"
-                    value={dataEntrada}
-                    onChange={(e) => setDataEntrada(e.target.value)}
-                    className="date-input"
-                  />
+                  <input type="date" value={dataEntrada} onChange={(e) => setDataEntrada(e.target.value)} className="date-input" />
                 </div>
                 <div>
                   <label>Saída</label>
-                  <input
-                    type="date"
-                    value={dataSaida}
-                    onChange={(e) => setDataSaida(e.target.value)}
-                    className="date-input"
-                    min={dataEntrada}
-                  />
+                  <input type="date" value={dataSaida} onChange={(e) => setDataSaida(e.target.value)} className="date-input" min={dataEntrada} />
                 </div>
               </div>
               <p className="data-selecionada">
@@ -294,7 +292,6 @@ const MarcacoesPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Reservas do dia */}
             <div className="marcacoes-do-dia">
               <h3>Reservas neste intervalo - {countReservas}</h3>
 
@@ -308,10 +305,7 @@ const MarcacoesPage: React.FC = () => {
                         <p className="estado-reserva">{reserva.estado}</p>
                         <p className="reserva-descricao">Data Entrada: {datanormal(reserva.dataEntrada)} e Data Saida: {datanormal(reserva.dataSaida)}</p>
                       </div>
-                      <button
-                        onClick={() => apagarReserva(reserva.idReserva)}
-                        className="btn-apagar"
-                      >
+                      <button onClick={() => apagarReserva(reserva.idReserva)} className="btn-apagar">
                         <Trash2 size={16} />
                       </button>
                     </li>
@@ -323,7 +317,6 @@ const MarcacoesPage: React.FC = () => {
             </div>
           </section>
 
-          {/* PARTE 2: ADICIONAR ANIMAL */}
           <section className="secao-cao">
             <h2>
               <Plus size={24} /> Selecione ou Adicione um Animal
@@ -348,9 +341,7 @@ const MarcacoesPage: React.FC = () => {
                         )}
                       </div>
                       <p><strong>Raça:</strong> {animal.raca}</p>
-                      <p><strong>Estado:</strong> {animal.estado}</p>
-                      <p><strong>Reatividade:</strong> {animal.reatividade}</p>
-                      <p><strong>Microchip:</strong> {animal.microchip}</p>
+                      <p><strong>Trela Recom.:</strong> {animal.tipoTrela || 'Normal'}</p>
                     </div>
                   ))}
                 </div>
@@ -359,15 +350,11 @@ const MarcacoesPage: React.FC = () => {
               )}
             </div>
 
-            {/* Botão para adicionar novo animal */}
-            <button
-              className="btn-adicionar-cao"
-              onClick={() => setMostrarNovoFormulario(!mostrarNovoFormulario)}
-            >
+            <button className="btn-adicionar-cao" onClick={() => setMostrarNovoFormulario(!mostrarNovoFormulario)}>
               <Plus size={18} /> Adicionar Novo Animal
             </button>
 
-            {/* Formulário para novo animal */}
+            {/* FORMULÁRIO ATUALIZADO */}
             {mostrarNovoFormulario && (
               <form className="novo-cao-form">
                 <h3>Registar Novo Animal</h3>
@@ -375,33 +362,15 @@ const MarcacoesPage: React.FC = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Nome do Animal *</label>
-                    <input
-                      type="text"
-                      name="nome"
-                      value={novoAnimal.nome}
-                      onChange={handleNovoAnimalChange}
-                      placeholder="ex: Bobby"
-                      required
-                    />
+                    <input type="text" name="nome" value={novoAnimal.nome} onChange={handleNovoAnimalChange} placeholder="ex: Bobby" required />
                   </div>
                   <div className="form-group">
                     <label>Raça *</label>
-                    <select
-                      name="raca"
-                      value={novoAnimal.raca}
-                      onChange={handleNovoAnimalChange}
-                      required
-                    >
+                    <select name="raca" value={novoAnimal.raca} onChange={handleNovoAnimalChange} required>
                       <option value="">Selecione a raça</option>
                       <option value="Labrador">Labrador</option>
-                      <option value="Poodle">Poodle</option>
-                      <option value="Bulldog">Bulldog</option>
                       <option value="Pastor Alemão">Pastor Alemão</option>
                       <option value="Golden Retriever">Golden Retriever</option>
-                      <option value="Beagle">Beagle</option>
-                      <option value="Dachshund">Dachshund</option>
-                      <option value="Pug">Pug</option>
-                      <option value="Shih Tzu">Shih Tzu</option>
                       <option value="Outros">Outros</option>
                     </select>
                   </div>
@@ -411,12 +380,7 @@ const MarcacoesPage: React.FC = () => {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Especifique a Raça</label>
-                      <input
-                        type="text"
-                        value={racaCustomizada}
-                        onChange={(e) => setRacaCustomizada(e.target.value)}
-                        placeholder="ex: Pinscher"
-                      />
+                      <input type="text" value={racaCustomizada} onChange={(e) => setRacaCustomizada(e.target.value)} placeholder="ex: Pinscher" />
                     </div>
                   </div>
                 )}
@@ -424,37 +388,48 @@ const MarcacoesPage: React.FC = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Reatividade *</label>
-                    <select
-                      name="reatividade"
-                      value={novoAnimal.reatividade}
-                      onChange={handleNovoAnimalChange}
-                      required
-                    >
+                    <select name="reatividade" value={novoAnimal.reatividade} onChange={handleNovoAnimalChange} required>
                       <option value="">Selecione</option>
                       <option value="Não Reativo">Não Reativo</option>
                       <option value="Reativo">Reativo</option>
                     </select>
-                </div>
+                  </div>
                   <div className="form-group">
                     <label>Microchip</label>
-                    <input
-                      type="text"
-                      name="microchip"
-                      value={novoAnimal.microchip}
-                      onChange={handleNovoAnimalChange}
-                      placeholder="ex: 123456789"
-                    />
+                    <input type="text" name="microchip" value={novoAnimal.microchip} onChange={handleNovoAnimalChange} placeholder="ex: 123456789" />
+                  </div>
+                </div>
+
+                {/* AS 3 NOVAS PERGUNTAS */}
+                <div className="form-row" style={{ backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                  <div className="form-group">
+                    <label>Tipo de Trela Recomendada</label>
+                    <select name="tipoTrela" value={novoAnimal.tipoTrela} onChange={handleNovoAnimalChange}>
+                      <option value="Normal">Trela Normal</option>
+                      <option value="Soft">Trela Soft (Pescoço Sensível)</option>
+                      <option value="Peitoral">Peitoral / Arnês</option>
+                      <option value="Halti">Halti / Cabresto</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Marca da Ração</label>
+                    <select name="racaoId" value={novoAnimal.racaoId} onChange={handleNovoAnimalChange}>
+                      <option value="">-- O cão traz a própria comida --</option>
+                      {racoes.map(racao => (
+                        <option key={racao.idItem} value={racao.idItem}>{racao.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Dose Diária (kg)</label>
+                    <input type="number" step="0.1" min="0" name="doseDiaria" value={novoAnimal.doseDiaria} onChange={handleNovoAnimalChange} placeholder="ex: 0.3" disabled={!novoAnimal.racaoId} />
                   </div>
                 </div>
 
                 <div className="form-row form-row-full">
                   <div className="form-group">
                     <label>Boletim de Vacinas (PDF)</label>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setVacinasFile(e.target.files?.[0] || null)}
-                    />
+                    <input type="file" accept=".pdf" onChange={(e) => setVacinasFile(e.target.files?.[0] || null)} />
                     {vacinasFile && <p className="file-info">✓ {vacinasFile.name}</p>}
                   </div>
                 </div>
@@ -465,7 +440,6 @@ const MarcacoesPage: React.FC = () => {
               </form>
             )}
 
-            {/* Botão para criar reserva */}
             {animalSelecionado && (
               <div className="detalhes-reserva-section">
                 <h3>Confirmar Reserva para {animalSelecionado.nome}</h3>
@@ -473,48 +447,22 @@ const MarcacoesPage: React.FC = () => {
                 <p><strong>Raça:</strong> {animalSelecionado.raca}</p>
                 <p><strong>Reatividade:</strong> {animalSelecionado.reatividade}</p>
                 
-                {/* Seleção de Serviços */}
                 <div className="servicos-section">
                   <h4>Serviços Adicionais</h4>
-                  
                   <div className="form-group">
                     <label>Banhos (€20 cada)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={calcularMaxAdicionais()}
-                      value={banhos}
-                      onChange={(e) => setBanhos(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="quantity-input"
-                    />
+                    <input type="number" min="0" max={calcularMaxAdicionais()} value={banhos} onChange={(e) => setBanhos(Math.max(0, parseInt(e.target.value) || 0))} className="quantity-input" />
                   </div>
-                  
                   <div className="form-group">
                     <label>Tosquias (€10 cada)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={calcularMaxAdicionais()}
-                      value={tosquias}
-                      onChange={(e) => setTosquias(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="quantity-input"
-                    />
+                    <input type="number" min="0" max={calcularMaxAdicionais()} value={tosquias} onChange={(e) => setTosquias(Math.max(0, parseInt(e.target.value) || 0))} className="quantity-input" />
                   </div>
-                  
                   <div className="form-group">
                     <label>Passeios (€10 cada)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={calcularMaxAdicionais()*2}
-                      value={passeios}
-                      onChange={(e) => setPasseios(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="quantity-input"
-                    />
+                    <input type="number" min="0" max={calcularMaxAdicionais()*2} value={passeios} onChange={(e) => setPasseios(Math.max(0, parseInt(e.target.value) || 0))} className="quantity-input" />
                   </div>
                 </div>
 
-                {/* Resumo de Preço */}
                 <div className="preco-resumo">
                   <p><strong>Estadia:</strong> {((new Date(dataSaida).getTime() - new Date(dataEntrada).getTime()) / (1000 * 60 * 60 * 24)).toFixed(1)} dias × €20 = €{(((new Date(dataSaida).getTime() - new Date(dataEntrada).getTime()) / (1000 * 60 * 60 * 24)) * 20).toFixed(2)}</p>
                   <p><strong>Banhos:</strong> {banhos} × €20 = €{(banhos * 20).toFixed(2)}</p>
@@ -530,9 +478,6 @@ const MarcacoesPage: React.FC = () => {
             )}
           </section>
         </div>
-        <a href="/tutor" className="btn-voltar">
-          Voltar
-        </a>
       </main>
 
       <Footer />

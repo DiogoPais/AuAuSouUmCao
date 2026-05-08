@@ -60,13 +60,14 @@ export class GestorHotelFacade {
     return await this.gestReservas.listarTodas(); 
   }
 
-  async checkIn(idReserva: string) { 
-    return await this.gestReservas.confirmarCheckIn(idReserva); 
+  // 👇 ATUALIZADO: Agora exige os termos aceites
+  async checkIn(idReserva: string, termosAceites: boolean) { 
+    return await this.gestReservas.confirmarCheckIn(idReserva, termosAceites); 
   }
 
-  async checkOut(idReserva: string) { 
-    // Orquestração: Ao fazer check-out, podemos já chamar a faturação no futuro!
-    return await this.gestReservas.confirmarCheckOut(idReserva); 
+  // 👇 ATUALIZADO: Agora chama a faturação e exige método de pagamento
+  async checkOut(idReserva: string, metodoPagamento: string) { 
+    return await this.gestReservas.processarCheckOutCompleto(idReserva, metodoPagamento); 
   }
 
   async cancelarReserva(idReserva: string) { 

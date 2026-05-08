@@ -189,11 +189,17 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
         uploadedFile.originalname,
         uploadedFile.buffer,
         uploadedFile.mimetype,
-        'documentos' // Fica trancado na pasta documentos
+        'documentos' 
       );
     }
     
     const { boletimVacinasUrl, ...dadosLimposParaA_BD } = req.body;
+    
+    // 👇 A CORREÇÃO ENTRA AQUI 👇
+    // Converte a string do FormData para número real (Float)
+    if (dadosLimposParaA_BD.doseDiaria) {
+      dadosLimposParaA_BD.doseDiaria = parseFloat(dadosLimposParaA_BD.doseDiaria);
+    }
     
     const novoAnimal = await gestor.registarAnimal(dadosLimposParaA_BD, uploadedFile ? {
       dataUltimaVacina: new Date(),
@@ -230,18 +236,26 @@ router.post('/reservas', async (req: Request, res: Response) => {
   }
 });
 
+// ROTA DO CHECK-IN (Corrigida: sem o /api no início)
 router.patch('/reservas/:id/checkin', async (req, res) => {
   try {
-    const r = await gestor.checkIn(req.params.id);
-    res.json(r);
-  } catch (error: any) { res.status(400).json({ error: error.message }); }
+    const { termosAceites } = req.body; 
+    const result = await gestor.checkIn(req.params.id, termosAceites);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
+// ROTA DO CHECK-OUT (Corrigida: sem o /api no início)
 router.patch('/reservas/:id/checkout', async (req, res) => {
   try {
-    const r = await gestor.checkOut(req.params.id);
-    res.json(r);
-  } catch (error: any) { res.status(400).json({ error: error.message }); }
+    const { metodoPagamento } = req.body; 
+    const result = await gestor.checkOut(req.params.id, metodoPagamento);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 router.patch('/reservas/:id/cancelar', async (req, res) => {
@@ -434,6 +448,33 @@ router.patch('/veterinaria/tratamentos/:idLinha/finalizar', async (req, res) => 
   try {
     const tratamento = await gestor.finalizarTratamento(req.params.idLinha);
     res.json({ message: 'Tratamento concluído!', tratamento });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ROTAS DA GESTORA
+router.get('/faturas', async (req, res) => {
+  try {
+    // Nota: Deves adicionar listarFaturas() no GestorHotelFacade que chame o FaturaDAO.findAll()
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const faturas = await prisma.faturas.findMany({ orderBy: { idFaturas: 'desc' }});
+    res.json(faturas);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/logs', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const logs = await prisma.diarioBordo.findMany({ 
+      include: { animal: true },
+      orderBy: { timestamp: 'desc' }
+    });
+    res.json(logs);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

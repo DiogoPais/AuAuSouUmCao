@@ -47,6 +47,7 @@ enum TipoServico {
   Grooming
   Passeio
   Adestramento
+  Alimentacao
 }
 
 // ==========================================
@@ -84,6 +85,7 @@ model Funcionario {
   // Relações clínicas
   prescricoes Prescricao[]
   logsMedicos LogMedicacao[]
+  tarefasAtribuidas Servico[]
 }
 
 // ==========================================
@@ -97,6 +99,10 @@ model Animal {
   microchip   String        @unique
   estado      EstadoClinico @default(Saudavel)
   check       Boolean       @default(false)
+  tipoTrela   String?       @default("Normal")
+
+  racaoId     String?       // Guarda o ID do Item de Stock da Ração que o cão come
+  doseDiaria  Float?        // Quantidade a descontar de cada vez que a tarefa for concluída
 
   // Os animais é que têm tutor (Chave Estrangeira aqui)
   tutorNif String
@@ -120,12 +126,14 @@ model PlanoVacinal {
 }
 
 model Box {
-  numero   Int       @id
-  tamanho  Int
-  ocupacao Int
-  estado   EstadoBox @default(Higienizada)
+  numero    Int       @id
+  
+  // NOVOS CAMPOS EXCLUSIVOS (Substituem o Tamanho):
+  tipo      String    @default("Não-Reativo") 
+  
+  estado    String    @default("Limpa")
 
-  reservas Reserva[] // Exigência Prisma (A FK está na Reserva)
+  reservas  Reserva[]
 }
 
 model Reserva {
@@ -134,6 +142,7 @@ model Reserva {
   dataSaida   DateTime
   valor       Float
   estado      EstadoReserva @default(Pendente)
+  termoAceite Boolean       @default(false)
 
   // A reserva tem animal e tem box (As Chaves Estrangeiras ficam aqui)
   animalId String
@@ -159,6 +168,9 @@ model Servico {
 
   reservaId String
   reserva   Reserva @relation(fields: [reservaId], references: [idReserva])
+
+  funcionarioId String?
+  funcionario   Funcionario? @relation(fields: [funcionarioId], references: [idFuncionario])
 }
 
 model Faturas {
@@ -166,6 +178,8 @@ model Faturas {
   nifCliente String
   valorTotal Float
   documento  String
+
+  metodoPagamento String @default("Não Definido")
 
   // Sem referência direta à Reserva, a Reserva é que lhe aponta.
   reserva Reserva?
