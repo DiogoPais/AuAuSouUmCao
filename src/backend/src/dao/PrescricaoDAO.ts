@@ -30,10 +30,20 @@ export class PrescricaoDAO {
     });
   }
 
-  // 2. PUXAR TRATAMENTOS ATIVOS (Sem o 'take: 1' para contar o histórico completo)
+  // 2. PUXAR TRATAMENTOS ATIVOS (Agora com filtro de presença no hotel!)
   async listarTratamentosAtivos() {
     return await prisma.linhaPrescricao.findMany({
-      where: { ativa: true },
+      where: { 
+        ativa: true,
+        // 👇 A MAGIA ESTÁ AQUI: Só mostra se o cão estiver fisicamente no hotel! 👇
+        prescricao: {
+          animal: {
+            reservas: {
+              some: { estado: 'CheckIn' }
+            }
+          }
+        }
+      },
       include: {
         medicamento: { include: { stock: true } },
         prescricao: { 
@@ -43,7 +53,7 @@ export class PrescricaoDAO {
           } 
         },
         logsAdministracao: {
-          orderBy: { timestamp: 'desc' } // Trazemos TODOS os logs para fazer a barra de progresso
+          orderBy: { timestamp: 'desc' }
         }
       },
       orderBy: { prescricao: { data: 'desc' } }

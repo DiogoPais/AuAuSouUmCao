@@ -229,7 +229,10 @@ const MarcacoesPage: React.FC = () => {
     return d.toLocaleDateString('pt-PT');
   }
 
-  const reservasProprias = reservas.filter((r) => r.animal.tutorNif === utilizador.nif);
+  const reservasProprias = reservas.filter((r) => 
+    r.animal.tutorNif === utilizador.nif && 
+    (r.estado === 'Pendente' || r.estado === 'CheckIn')
+  );
 
   const countReservas = reservas.filter((r) => {
     const entrada = new Date(r.dataEntrada);
