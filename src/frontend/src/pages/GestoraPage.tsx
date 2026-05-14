@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  FileText, Download, DollarSign, Activity, Printer, ArrowLeft, ShieldCheck, FileSearch, Building, CalendarDays, Package, AlertTriangle
+  FileText, Download, DollarSign, Activity, Printer, ArrowLeft, ShieldCheck, FileSearch, Building, CalendarDays, Package, AlertTriangle, Eye, BellRing
 } from 'lucide-react';
 import Header from '../components/Header';
 import './GestoraPage.css';
@@ -27,10 +27,13 @@ interface Documentacao {
   dataSaida: string;
   estado: string;
   termoAceite: boolean;
+  boxNumero: number;
   animal: {
     nome: string;
     tipoTrela: string;
-    planoVacinal?: { documento: string; isValido: boolean };
+    estado: string;
+    reatividade: string;
+    planoVacinal?: { documento: string; isValido: boolean; dataUltimaVacina?: string };
     tutor?: { utilizador?: { nome: string } };
   };
 }
@@ -43,14 +46,15 @@ interface StockItem {
 }
 
 const GestoraPage: React.FC = () => {
-  // A aba 'HOTEL' é agora a padrão mal a gestora entra na página!
   const [activeTab, setActiveTab] = useState<'HOTEL' | 'FINANCAS' | 'LOGS' | 'ARQUIVO'>('HOTEL');
-  
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [docs, setDocs] = useState<Documentacao[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // NOVO: Estado para ver os cães num dia específico do calendário
+  const [diaDetalheSelecionado, setDiaDetalheSelecionado] = useState<{data: string, caes: any[]} | null>(null);
 
   const gestora = {
     nome: localStorage.getItem('user_nome') || 'Gestora',
@@ -65,7 +69,6 @@ const GestoraPage: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Puxamos todas as infos de uma vez
         const [resFaturas, resLogs, resDocs, resStock] = await Promise.all([
           axios.get(`${API_URL}/api/faturas`),
           axios.get(`${API_URL}/api/logs`),
@@ -98,8 +101,10 @@ const GestoraPage: React.FC = () => {
   };
 
   // ==========================================
-  // CÁLCULOS: OCUPAÇÃO (CALENDÁRIO DE 7 DIAS)
+  // CÁLCULOS: OCUPAÇÃO E AVISOS
   // ==========================================
+  const alertasDeStock = stock.filter(s => s.quantidade <= 10); // Ração e medicamentos em baixo
+
   const calcularOcupacao = () => {
     const dias = [];
     const hoje = new Date();
@@ -109,17 +114,14 @@ const GestoraPage: React.FC = () => {
       const dataDia = new Date(hoje);
       dataDia.setDate(dataDia.getDate() + i);
       
-      const ocupados = docs.filter(r => {
+      const caesNesteDia = docs.filter(r => {
         if (r.estado === 'Cancelada' || r.estado === 'CheckOut') return false;
-        
         const inDate = new Date(r.dataEntrada).setHours(0, 0, 0, 0);
         const outDate = new Date(r.dataSaida).setHours(0, 0, 0, 0);
-        
-        // O cão está no hotel se o dia atual for >= data de entrada e < data de saída
         return dataDia.getTime() >= inDate && dataDia.getTime() < outDate;
-      }).length;
+      }).map(r => ({ nome: r.animal.nome, box: r.boxNumero, dono: r.animal.tutor?.utilizador?.nome }));
 
-      dias.push({ data: dataDia, ocupados });
+      dias.push({ data: dataDia, ocupados: caesNesteDia.length, caes: caesNesteDia });
     }
     return dias;
   };
@@ -127,7 +129,7 @@ const GestoraPage: React.FC = () => {
   const ocupacaoDias = calcularOcupacao();
 
   // ==========================================
-  // MÉTRICAS FINANCEIRAS E EXPORTAÇÕES
+  // EXPORTAÇÕES E FINANÇAS
   // ==========================================
   const totalFaturado = faturas.reduce((acc, f) => acc + f.valorTotal, 0);
   const totalIVA = totalFaturado * 0.23; 
@@ -153,21 +155,12 @@ const GestoraPage: React.FC = () => {
 
   const imprimirRelatorioPDF = () => window.print();
 
-  if (loading) {
-    return (
-      <div className="gestora-page-container">
-        <Header userData={gestora} />
-        <div style={{ textAlign: 'center', padding: '50px' }}>A carregar Dashboard...</div>
-      </div>
-    );
-  }
+  if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>A carregar Dashboard...</div>;
 
   return (
     <div className="gestora-page-container" style={{ minHeight: '100vh', backgroundColor: '#f4f7f6', paddingBottom: '40px' }}>
       
-      <div className="no-print">
-        <Header userData={gestora} />
-      </div>
+      <div className="no-print"><Header userData={gestora} /></div>
 
       <div className="print-only" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>
         <h2>Relatório de Incidentes e Auditoria - Hotel Canino</h2>
@@ -194,30 +187,73 @@ const GestoraPage: React.FC = () => {
         </div>
 
         {/* ============================================== */}
-        {/* ABA 0: VISÃO GERAL (HOTEL, CALENDÁRIO E STOCK) */}
+        {/* ABA 0: VISÃO GERAL (HOTEL, CALENDÁRIO, AVISOS) */}
         {/* ============================================== */}
         {activeTab === 'HOTEL' && (
           <section className="gestora-section no-print">
             <h2 style={{ marginBottom: '20px', color: '#333' }}>Visão Geral Operacional</h2>
             
+            {/* NOVO: SECÇÃO DE ALERTAS */}
+            {alertasDeStock.length > 0 && (
+              <div style={{ background: '#fff3cd', borderLeft: '5px solid #ffc107', padding: '15px 20px', borderRadius: '4px', marginBottom: '20px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#856404', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BellRing size={20} /> Avisos Importantes do Sistema
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404', fontSize: '14px' }}>
+                  {alertasDeStock.map(a => (
+                    <li key={a.idItem}><strong>{a.nome}</strong> está a acabar! (Restam apenas {a.quantidade} unid.)</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               
-              {/* Ocupação / Calendário */}
+              {/* CALENDÁRIO CLICÁVEL */}
               <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <CalendarDays size={20} color="#0066cc" /> Próximos 7 Dias (Hóspedes)
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
-                  {ocupacaoDias.map((d, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa', borderRadius: '6px', borderLeft: d.ocupados >= 35 ? '4px solid #ffc107' : '4px solid #28a745' }}>
-                      <span style={{ fontWeight: '500' }}>
-                        {i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.data.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      </span>
-                      <strong>{d.ocupados} Cães {d.ocupados >= 40 && '(Lotação Esgotada)'}</strong>
-                    </div>
-                  ))}
+                  {ocupacaoDias.map((d, i) => {
+                    const nomeDia = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.data.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' });
+                    return (
+                      <div 
+                        key={i} 
+                        onClick={() => setDiaDetalheSelecionado({ data: nomeDia, caes: d.caes })}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa', borderRadius: '6px', borderLeft: d.ocupados >= 35 ? '4px solid #ffc107' : '4px solid #28a745', cursor: 'pointer', transition: 'background 0.2s' }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#e2e6ea'}
+                        onMouseOut={(e) => e.currentTarget.style.background = d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa'}
+                      >
+                        <span style={{ fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {nomeDia} <Eye size={16} color="#0066cc" />
+                        </span>
+                        <strong>{d.ocupados} Cães {d.ocupados >= 40 && '(Cheio)'}</strong>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* PAINEL DINÂMICO DE CÃES (ABRE QUANDO CLICAS NUM DIA) */}
+              {diaDetalheSelecionado && (
+                <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', border: '2px solid #0066cc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    <h3 style={{ margin: 0, color: '#0066cc' }}>Animais - {diaDetalheSelecionado.data}</h3>
+                    <button onClick={() => setDiaDetalheSelecionado(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>X</button>
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '15px 0 0 0', maxHeight: '350px', overflowY: 'auto' }}>
+                    {diaDetalheSelecionado.caes.length > 0 ? diaDetalheSelecionado.caes.map((cao, index) => (
+                      <li key={index} style={{ padding: '8px 10px', borderBottom: '1px dashed #ccc', fontSize: '14px' }}>
+                        <strong>{cao.nome}</strong> (Box {cao.box}) <br/>
+                        <small style={{ color: '#666' }}>Tutor: {cao.dono || 'N/A'}</small>
+                      </li>
+                    )) : (
+                      <p style={{ textAlign: 'center', color: '#888' }}>Nenhum cão previsto para este dia.</p>
+                    )}
+                  </ul>
+                </div>
+              )}
 
               {/* Controlo de Stock Rápido */}
               <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
@@ -244,7 +280,7 @@ const GestoraPage: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* ABA 1: FINANÇAS INTEGRAIS                      */}
+        {/* ABA 1: FINANÇAS INTEGRAIS (FATURA CLICÁVEL)    */}
         {/* ============================================== */}
         {activeTab === 'FINANCAS' && (
           <section className="dashboard-section no-print">
@@ -274,24 +310,31 @@ const GestoraPage: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
-                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Documento</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Data/Fatura</th>
                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>NIF Cliente</th>
                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Método Pagamento</th>
                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Valor Total</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Visualizar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {faturas.length > 0 ? faturas.map(f => (
                     <tr key={f.idFaturas} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '12px', color: '#0066cc', fontWeight: 'bold' }}>{f.documento}</td>
+                      <td style={{ padding: '12px', color: '#555', fontWeight: 'bold' }}>{f.documento.split('-')[1] ? new Date(parseInt(f.documento.split('-')[1])).toLocaleDateString() : 'N/A'}</td>
                       <td style={{ padding: '12px' }}>{f.nifCliente}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ background: '#e9ecef', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>{f.metodoPagamento}</span>
-                      </td>
+                      <td style={{ padding: '12px' }}><span style={{ background: '#e9ecef', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>{f.metodoPagamento}</span></td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>{f.valorTotal.toFixed(2)} €</td>
+                      <td style={{ padding: '12px' }}>
+                        <button 
+                          onClick={() => handleAbrirPdf(f.documento)}
+                          style={{ background: '#007bff', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          📄 Abrir PDF
+                        </button>
+                      </td>
                     </tr>
                   )) : (
-                    <tr><td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhuma fatura emitida.</td></tr>
+                    <tr><td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhuma fatura emitida.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -300,12 +343,12 @@ const GestoraPage: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* ABA 2: AUDITORIA E LOGS                        */}
+        {/* ABA 2: AUDITORIA E LOGS (AGORA MOSTRA O NOME)  */}
         {/* ============================================== */}
         {activeTab === 'LOGS' && (
           <section className="logs-section">
             <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#333' }}>Auditoria de Operações e Incidentes</h2>
+              <h2 style={{ margin: '0', color: '#333' }}>Auditoria de Operações e Incidentes</h2>
               
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -328,8 +371,8 @@ const GestoraPage: React.FC = () => {
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Data e Hora</th>
-                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Animal Relacionado</th>
-                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Descrição do Log / Incidente</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Animal</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #dee2e6' }}>Descrição da Ação / Funcionário</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,46 +395,42 @@ const GestoraPage: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* ABA 3: ARQUIVO DIGITAL                         */}
+        {/* ABA 3: ARQUIVO DIGITAL (MAIS INFORMAÇÃO)       */}
         {/* ============================================== */}
         {activeTab === 'ARQUIVO' && (
           <section className="gestora-section no-print">
             <h2 style={{ marginBottom: '20px' }}><FileSearch size={22} style={{ verticalAlign: 'middle' }} /> Consulta de Documentação Legal</h2>
             <div style={{ background: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead style={{ background: '#f8f9fa' }}>
                   <tr>
                     <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Animal / Tutor</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Estado Físico / Estadia</th>
                     <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Termo Resp.</th>
-                    <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Boletim Vacinas</th>
-                    <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Trela / Saúde</th>
+                    <th style={{ padding: '12px', borderBottom: '2px solid #eee' }}>Data Vacina / Boletim</th>
                   </tr>
                 </thead>
                 <tbody>
                   {docs.map((d) => (
                     <tr key={d.idReserva} style={{ borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '12px' }}>
-                        <strong>{d.animal.nome}</strong><br/>
+                        <strong>{d.animal.nome}</strong> <span style={{ color: '#888', fontSize: '12px' }}>({d.animal.reatividade})</span><br/>
                         <small style={{ color: '#666' }}>{d.animal.tutor?.utilizador?.nome || 'N/A'}</small>
                       </td>
                       <td style={{ padding: '12px' }}>
-                        {d.termoAceite ? 
-                          <span style={{ color: '#28a745', fontWeight: 'bold' }}>✓ Aceite</span> : 
-                          <span style={{ color: '#dc3545' }}>⚠ Pendente</span>
-                        }
+                        <span style={{ color: d.animal.estado === 'Quarentena' ? '#dc3545' : '#28a745', fontWeight: 'bold' }}>{d.animal.estado}</span><br/>
+                        <small style={{ color: '#888' }}>{d.estado}</small>
                       </td>
                       <td style={{ padding: '12px' }}>
-                        {d.animal.planoVacinal?.documento ? (
-                          <button 
-                            onClick={() => handleAbrirPdf(d.animal.planoVacinal!.documento)}
-                            style={{ background: '#e3f2fd', color: '#007bff', border: '1px solid #007bff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                          >
+                        {d.termoAceite ? <span style={{ color: '#28a745', fontWeight: 'bold' }}>✓ Aceite</span> : <span style={{ color: '#dc3545' }}>⚠ Pendente</span>}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ marginBottom: '5px' }}>{d.animal.planoVacinal?.dataUltimaVacina ? new Date(d.animal.planoVacinal.dataUltimaVacina).toLocaleDateString() : 'Sem Data'}</div>
+                        {d.animal.planoVacinal?.documento && (
+                          <button onClick={() => handleAbrirPdf(d.animal.planoVacinal!.documento)} style={{ background: '#e3f2fd', color: '#007bff', border: '1px solid #007bff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
                             📄 Abrir Boletim
                           </button>
-                        ) : 'Não submetido'}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ fontSize: '13px' }}>Trela: {d.animal.tipoTrela}</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -401,25 +440,10 @@ const GestoraPage: React.FC = () => {
           </section>
         )}
 
-        {/* BOTÃO VOLTAR AO MENU */}
         <div className="no-print" style={{ marginTop: '40px' }}>
           <button 
             onClick={() => window.history.back()}
-            style={{ 
-              padding: '10px 20px', 
-              background: '#6c757d', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              fontWeight: 'bold',
-              transition: 'background 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#5a6268'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#6c757d'}
+            style={{ padding: '10px 20px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
           >
             <ArrowLeft size={18} /> Voltar ao Menu Principal
           </button>

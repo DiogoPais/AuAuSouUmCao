@@ -9,7 +9,8 @@ interface Reserva {
   dataEntrada: string;
   dataSaida: string;
   estado: string;
-  valor: number; // NOVO: Precisamos do valor base para a faturação
+  valor: number; 
+  fatura?: { documento: string }; // NOVO: Para podermos aceder ao PDF da fatura
   animal: {
     idAnimal: string;
     nome: string;
@@ -23,7 +24,8 @@ interface Reserva {
 }
 
 const RececaoPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'IN' | 'OUT'>('IN');
+  // NOVO: Adicionada a aba HISTORICO
+  const [activeTab, setActiveTab] = useState<'IN' | 'OUT' | 'HISTORICO'>('IN');
   const [showBilling, setShowBilling] = useState(false);
   const [reservaParaPagar, setReservaParaPagar] = useState<string | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -34,7 +36,7 @@ const RececaoPage: React.FC = () => {
   const [dataVacina, setDataVacina] = useState('');
   const [vacinaValida, setVacinaValida] = useState(true);
   
-  // NOVOS ESTADOS: Termos de Responsabilidade (Check-IN) e Pagamento (Check-OUT)
+  // Estados Termos de Responsabilidade e Pagamento
   const [termo1, setTermo1] = useState(false);
   const [termo2, setTermo2] = useState(false);
   const [metodoPagamento, setMetodoPagamento] = useState('');
@@ -77,7 +79,7 @@ const RececaoPage: React.FC = () => {
         setShowPlanoModal(true);
         setDataVacina('');
         setVacinaValida(true);
-        setTermo1(false); // Reset aos termos
+        setTermo1(false);
         setTermo2(false);
         return;
       } else {
@@ -97,14 +99,12 @@ const RececaoPage: React.FC = () => {
     }
 
     try {
-      // 1. Atualiza a vacina
       await axios.patch(`${API_URL}/api/plano-vacinal/${reservaPlanoSelecionada.animal.idAnimal}`, {
         dataUltimaVacina: new Date(dataVacina),
         isValido: vacinaValida,
         estado: vacinaValida ? 'Valido' : 'Caducado'
       });
 
-      // 2. Faz o Check-in passando a confirmação dos termos!
       await axios.patch(`${API_URL}/api/reservas/${reservaPlanoSelecionada.idReserva}/checkin`, {
         termosAceites: termo1 && termo2
       });
@@ -129,7 +129,7 @@ const RececaoPage: React.FC = () => {
       await axios.patch(`${API_URL}/api/reservas/${reservaParaPagar}/checkout`, {
         metodoPagamento: metodoPagamento
       });
-      alert("Pagamento e Check-OUT concluídos com sucesso! Fatura emitida.");
+      alert("Pagamento e Check-OUT concluídos com sucesso! A fatura foi guardada no histórico.");
       setShowBilling(false);
       setReservaParaPagar(null);
       setMetodoPagamento('');
@@ -140,7 +140,7 @@ const RececaoPage: React.FC = () => {
   };
 
   // ==========================================
-  // LÓGICA DE FATURAÇÃO E ATRASOS (FRONTEND PREVIEW)
+  // FATURAÇÃO PREVIEW
   // ==========================================
   const reservaAtual = reservas.find(r => r.idReserva === reservaParaPagar);
   let diasAtraso = 0;
@@ -152,7 +152,7 @@ const RececaoPage: React.FC = () => {
     if (agora > saida) {
       const msAtraso = agora.getTime() - saida.getTime();
       diasAtraso = Math.ceil(msAtraso / (1000 * 60 * 60 * 24));
-      multa = diasAtraso * 20; // 20€ por dia extra
+      multa = diasAtraso * 20; 
     }
   }
 
@@ -161,7 +161,6 @@ const RececaoPage: React.FC = () => {
   const imposto = valorTotalSemIva * 0.23;
   const totalFaturar = valorTotalSemIva + imposto;
 
-  // Render do Ecrã de Faturação
   if (showBilling && reservaAtual) {
     return (
       <div className="rececao-page">
@@ -232,18 +231,20 @@ const RececaoPage: React.FC = () => {
     );
   }
 
-  // ==========================================
-  // LÓGICA DE ORDENAÇÃO DOS CHECK-OUTS
-  // ==========================================
+  // LÓGICA DE ORDENAÇÃO
   const checkoutsOrdenados = reservas
     .filter(r => r.estado === 'CheckIn')
-    .sort((a, b) => new Date(a.dataSaida).getTime() - new Date(b.dataSaida).getTime()); // Ordem cronológica pura
+    .sort((a, b) => new Date(a.dataSaida).getTime() - new Date(b.dataSaida).getTime());
+    
+  const faturasEmitidas = reservas
+    .filter(r => r.estado === 'CheckOut')
+    .sort((a, b) => new Date(b.dataSaida).getTime() - new Date(a.dataSaida).getTime());
 
   return (
     <div className="rececao-page">
       <Header userData={funcionario} />
       
-      {/* MODAL PARA PREENCHER PLANO VACINAL E TERMOS */}
+      {/* MODAL PLANO VACINAL OMITIDO POR BREVIDADE (Mantém-se igual ao original) */}
       {showPlanoModal && reservaPlanoSelecionada && (
         <div className="modal-overlay">
           <div className="modal-plano-vacinal" style={{ maxWidth: '600px' }}>
@@ -255,7 +256,6 @@ const RececaoPage: React.FC = () => {
                 <p><strong>NIF:</strong> {reservaPlanoSelecionada.animal.tutorNif}</p>
               </div>
 
-              {/* PASSO 1: VACINAS */}
               <h4 style={{ marginTop: '15px', borderBottom: '1px solid #ccc', paddingBottom: '5px' }}>1. Validação Clínica</h4>
               <div className="modal-form-group">
                 <label htmlFor="data-vacina">Data da Última Vacina:</label>
@@ -277,16 +277,15 @@ const RececaoPage: React.FC = () => {
                 </div>
               )}
 
-              {/* PASSO 2: TERMOS DE RESPONSABILIDADE */}
               <h4 style={{ marginTop: '20px', borderBottom: '1px solid #ccc', paddingBottom: '5px' }}>2. Termo de Responsabilidade</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', fontSize: '14px' }}>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={termo1} onChange={(e) => setTermo1(e.target.checked)} style={{ marginTop: '3px' }} />
-                  <span>Declaro que o tutor leu e aceitou as condições gerais do Termo de Responsabilidade Digital do Hotel.</span>
+                  <span>Declaro que o tutor leu e aceitou as condições gerais do Termo de Responsabilidade Digital.</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={termo2} onChange={(e) => setTermo2(e.target.checked)} style={{ marginTop: '3px' }} />
-                  <span>Confirmo a autorização do tutor para a prestação de cuidados veterinários de urgência, caso seja necessário.</span>
+                  <span>Confirmo a autorização do tutor para a prestação de cuidados de urgência.</span>
                 </label>
               </div>
             </div>
@@ -298,7 +297,7 @@ const RececaoPage: React.FC = () => {
               <button 
                 className="btn-confirmar-modal" 
                 onClick={handleConfirmarPlanoVacinal}
-                disabled={!(termo1 && termo2)} // Só ativa se os dois termos estiverem selecionados
+                disabled={!(termo1 && termo2)}
                 style={{ opacity: (termo1 && termo2) ? 1 : 0.5, cursor: (termo1 && termo2) ? 'pointer' : 'not-allowed' }}
               >
                 ✓ Confirmar e Check-In
@@ -308,49 +307,60 @@ const RececaoPage: React.FC = () => {
         </div>
       )}
       
+      {/* TABS ATUALIZADOS */}
       <nav className="tabs-bar">
         <button className={`tab-btn ${activeTab === 'IN' ? 'active' : ''}`} onClick={() => setActiveTab('IN')}>Check-IN</button>
         <div className="tab-separator"></div>
         <button className={`tab-btn ${activeTab === 'OUT' ? 'active' : ''}`} onClick={() => setActiveTab('OUT')}>Check-OUT</button>
+        <div className="tab-separator"></div>
+        <button className={`tab-btn ${activeTab === 'HISTORICO' ? 'active' : ''}`} onClick={() => setActiveTab('HISTORICO')}>Faturas Emitidas</button>
       </nav>
 
       <main className="rececao-content">
         <div className="rececao-card">
-          <h2>{activeTab === 'IN' ? 'Check-IN pré-feitos:' : 'Check-OUT (Cronológico):'}</h2>
           
-          <table className="rececao-table">
-            <thead>
-              {activeTab === 'IN' ? (
-                <tr><th>Nome</th><th>Ficha Tecnica</th><th>Pre-Check-IN</th><th>Operações</th></tr>
-              ) : (
-                <tr><th>Nome</th><th>Nome do Dono</th><th>Dia de Saida</th><th>Confirmar Saida</th></tr>
-              )}
-            </thead>
-            <tbody>
-              {/* RENDERIZAÇÃO INTELIGENTE (Pendente para IN, Cronológica para OUT) */}
-              {(activeTab === 'IN' ? reservas.filter(r => r.estado === 'Pendente') : checkoutsOrdenados).map((r, i) => (
-                <tr key={i}>
-                  {activeTab === 'IN' ? (
-                    <>
+          {/* TABELA: CHECK-IN */}
+          {activeTab === 'IN' && (
+            <>
+              <h2>Check-IN pré-feitos:</h2>
+              <table className="rececao-table">
+                <thead>
+                  <tr><th>Nome</th><th>Ficha Técnica</th><th>Pré-Check-IN</th><th>Operações</th></tr>
+                </thead>
+                <tbody>
+                  {reservas.filter(r => r.estado === 'Pendente').map((r, i) => (
+                    <tr key={i}>
                       <td>{r.animal.nome}</td>
-                        <td>
-                          {r.animal.planoVacinal?.documento ? (
-                            <button onClick={() => handleAbrirPdf(r.animal.planoVacinal!.documento)} style={{ color: '#17a2b8', fontWeight: 'bold', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '15px' }}>
-                              📄 Ver Ficha
-                            </button>
-                          ) : "Sem Ficha"}
-                        </td>
+                      <td>
+                        {r.animal.planoVacinal?.documento ? (
+                          <button onClick={() => handleAbrirPdf(r.animal.planoVacinal!.documento)} style={{ color: '#17a2b8', fontWeight: 'bold', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '15px' }}>📄 Ver Ficha</button>
+                        ) : "Sem Ficha"}
+                      </td>
                       <td>{r.animal.planoVacinal?.isValido ? "Sim" : "Não"}</td>
                       <td>
                         <button className="btn-s" onClick={() => handleCheckInAction(r.idReserva, true)}>S</button>
                         <button className="btn-n" onClick={() => handleCheckInAction(r.idReserva, false)}>N</button>
                       </td>
-                    </>
-                  ) : (
-                    <>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* TABELA: CHECK-OUT */}
+          {activeTab === 'OUT' && (
+            <>
+              <h2>Check-OUT (Cronológico):</h2>
+              <table className="rececao-table">
+                <thead>
+                  <tr><th>Nome do Cão</th><th>Nome do Dono</th><th>Dia de Saída Previsto</th><th>Confirmar Saída</th></tr>
+                </thead>
+                <tbody>
+                  {checkoutsOrdenados.map((r, i) => (
+                    <tr key={i}>
                       <td>{r.animal.nome}</td>
                       <td>{r.animal.tutor?.utilizador?.nome || 'Dono não encontrado'}</td>
-                      {/* Cor vermelha se o cão estiver em atraso */}
                       <td style={{ color: new Date() > new Date(r.dataSaida) ? '#dc3545' : 'inherit', fontWeight: new Date() > new Date(r.dataSaida) ? 'bold' : 'normal' }}>
                         {new Date(r.dataSaida).toLocaleDateString()}
                       </td>
@@ -359,12 +369,48 @@ const RececaoPage: React.FC = () => {
                           Faturar & Pagar
                         </button>
                       </td>
-                    </>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* TABELA: HISTÓRICO DE FATURAS */}
+          {activeTab === 'HISTORICO' && (
+            <>
+              <h2>Faturas Já Emitidas (Histórico de Saídas):</h2>
+              <table className="rececao-table">
+                <thead>
+                  <tr><th>Nome do Cão</th><th>Nome do Dono</th><th>Data Efetiva de Saída</th><th>Documento</th></tr>
+                </thead>
+                <tbody>
+                  {faturasEmitidas.length > 0 ? faturasEmitidas.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.animal.nome}</td>
+                      <td>{r.animal.tutor?.utilizador?.nome || 'Dono não encontrado'}</td>
+                      <td>{new Date(r.dataSaida).toLocaleDateString('pt-PT')}</td>
+                      <td>
+                        {r.fatura?.documento ? (
+                          <button 
+                            onClick={() => handleAbrirPdf(r.fatura!.documento)} 
+                            style={{ background: '#e3f2fd', color: '#007bff', border: '1px solid #007bff', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            📄 Sacar Fatura
+                          </button>
+                        ) : (
+                          <span style={{ color: '#888' }}>Fatura Indisponível</span>
+                        )}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Não há faturas no histórico recente.</td></tr>
                   )}
-                </tr>
-              ))}
-            </tbody>
-          </table>  
+                </tbody>
+              </table>
+            </>
+          )}
+          
         </div>
       </main>
       <Footer />

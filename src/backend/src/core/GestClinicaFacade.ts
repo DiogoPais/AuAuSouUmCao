@@ -77,11 +77,11 @@ export class GestClinicaFacade {
   // ==========================================
   // GESTÃO DE CHECKS DIÁRIOS E QUARENTENA
   // ==========================================
-  async registarCheckDiario(idAnimal: string, notas: string) {
+  async registarCheckDiario(idAnimal: string, notas: string, nomeVet: string = 'Veterinário(a)') {
     if (!notas || notas.trim().length === 0) {
       throw new Error("O check deve incluir notas do veterinário.");
     }
-    return await this.prescricaoDAO.registarCheckDiario(idAnimal, notas);
+    return await this.prescricaoDAO.registarCheckDiario(idAnimal, notas, nomeVet);
   }
 
   async listarCaesParaVerificar() {

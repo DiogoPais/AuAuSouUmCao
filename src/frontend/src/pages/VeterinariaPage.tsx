@@ -59,10 +59,41 @@ const VeterinariaPage: React.FC = () => {
 
   // O Motor do Countdown
   useEffect(() => {
-    const intervalo = setInterval(() => {
-      setAgora(new Date());
-    }, 60000); 
-    return () => clearInterval(intervalo);
+    const fetchDados = async () => {
+      try {
+        setLoading(true);
+        // BUG 8: Trocámos a chamada /api/animais por /api/reservas
+        const [resVerificar, resQuarentena, resStock, resReservas, resTratamentos] = await Promise.all([
+          axios.get(`${API_URL}/api/veterinaria/caes-para-verificar`),
+          axios.get(`${API_URL}/api/veterinaria/caes-quarentena`),
+          axios.get(`${API_URL}/api/stock`),
+          axios.get(`${API_URL}/api/reservas`), // <-- MUDANÇA AQUI
+          axios.get(`${API_URL}/api/veterinaria/tratamentos-ativos`)
+        ]);
+        
+        setCaesParaVerificar(resVerificar.data);
+        setCaesQuarentena(resQuarentena.data);
+        setTratamentosAtivos(resTratamentos.data);
+        
+        // BUG 8 RESOLVIDO: Filtra apenas as reservas 'CheckIn' e extrai os animais delas!
+        const caesInternados = resReservas.data
+          .filter((r: any) => r.estado === 'CheckIn')
+          .map((r: any) => r.animal);
+
+        // Removemos duplicados (se existirem) para a dropdown ficar limpa
+        const caesUnicos = Array.from(new Map(caesInternados.map((c: any) => [c.idAnimal, c])).values()) as Animal[];
+        
+        setTodosAnimais(caesUnicos); // Agora o dropdown da receita SÓ tem cães no hotel!
+        
+        const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
+        setMedicamentos(apenasMedicamentos);
+      } catch (err) {
+        console.error('Erro ao buscar dados:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDados();
   }, []);
 
   const extrairHorasFrequencia = (freq: string): number => {

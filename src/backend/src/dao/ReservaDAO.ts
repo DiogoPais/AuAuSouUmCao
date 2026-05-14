@@ -176,7 +176,8 @@ export class ReservaDAO {
       include: {
         reserva: {
           include: {
-            animal: true
+            animal: true,
+            box: true // 👇 A ÚNICA PALAVRA QUE FALTAVA PARA O MAPA FUNCIONAR! 👇
           }
         }
       }
@@ -270,17 +271,35 @@ export class ReservaDAO {
     });
   }
 
-  // Atualiza a reserva com o CheckOut, o valor final (multas) e liga à Fatura
-  // 👇 NOVO: SUJA A BOX DE FORMA AUTOMÁTICA
+  // 🐛 FIX BUGS 7: TIRAR DA QUARENTENA NO CHECK-OUT E SUJAR BOX
   async processarCheckOutDB(idReserva: string, valorFinal: number, idFatura: string) {
-    const reserva = await prisma.reserva.findUnique({ where: { idReserva } });
+    const reserva = await prisma.reserva.findUnique({ 
+      where: { idReserva },
+      include: { animal: true } // Precisamos do animal para ver a saúde dele
+    });
     
-    // REGRA DE NEGÓCIO: O cão saiu? A Box fica "Suja" à espera do Staff
     if (reserva) {
+      // 1. Suja a Box à espera do Staff
       await prisma.box.update({
         where: { numero: reserva.boxNumero },
         data: { estado: 'Suja' }
       });
+
+      // 2. [BUG 7 RESOLVIDO]: Dá "Alta" automática se ele estava em Quarentena!
+      if (reserva.animal.estado === 'Quarentena') {
+        await prisma.animal.update({
+          where: { idAnimal: reserva.animalId },
+          data: { estado: 'Saudavel' }
+        });
+        
+        // (Opcional) Regista no diário de bordo que a quarentena acabou porque o dono o levou
+        await prisma.diarioBordo.create({
+          data: {
+            descricao: `✅ [ALTA AUTOMÁTICA] O animal saiu do hotel (Check-Out), logo a quarentena médica foi encerrada no sistema.`,
+            animalId: reserva.animalId
+          }
+        });
+      }
     }
 
     return await prisma.reserva.update({
@@ -293,7 +312,18 @@ export class ReservaDAO {
     });
   }
 
+  // 🐛 FIX BUG 6: FORÇAR A VET A VER O CÃO NOVO
   async processarCheckInDB(idReserva: string) {
+    const reserva = await prisma.reserva.findUnique({ where: { idReserva } });
+    
+    if (reserva) {
+      // [BUG 6 RESOLVIDO]: Assim que entra no hotel, a flag de verificação volta a falso!
+      await prisma.animal.update({
+        where: { idAnimal: reserva.animalId },
+        data: { check: false } 
+      });
+    }
+
     return await prisma.reserva.update({
       where: { idReserva },
       data: { 

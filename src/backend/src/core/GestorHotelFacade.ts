@@ -60,12 +60,10 @@ export class GestorHotelFacade {
     return await this.gestReservas.listarTodas(); 
   }
 
-  // 👇 ATUALIZADO: Agora exige os termos aceites
   async checkIn(idReserva: string, termosAceites: boolean) { 
     return await this.gestReservas.confirmarCheckIn(idReserva, termosAceites); 
   }
 
-  // 👇 ATUALIZADO: Agora chama a faturação e exige método de pagamento
   async checkOut(idReserva: string, metodoPagamento: string) { 
     return await this.gestReservas.processarCheckOutCompleto(idReserva, metodoPagamento); 
   }
@@ -100,8 +98,9 @@ export class GestorHotelFacade {
   // ==========================================
   // DELEGAÇÃO: VETERINÁRIA
   // ==========================================
-  async registarCheckDiario(idAnimal: string, notas: string) {
-    return await this.gestClinica.registarCheckDiario(idAnimal, notas);
+  // 👇 ATUALIZADO: Agora recebe o nome do Veterinário
+  async registarCheckDiario(idAnimal: string, notas: string, nomeVet: string = 'Veterinário(a)') {
+    return await this.gestClinica.registarCheckDiario(idAnimal, notas, nomeVet);
   }
 
   async listarCaesParaVerificar() {
@@ -135,8 +134,9 @@ export class GestorHotelFacade {
     return await this.gestReservas.listarTarefasDoDia();
   }
 
-  async marcarTarefaConcluida(idServico: string) {
-    return await this.gestReservas.marcarTarefaConcluida(idServico);
+  // 👇 ATUALIZADO: Agora recebe o nome do membro do Staff
+  async marcarTarefaConcluida(idServico: string, nomeStaff: string = 'Staff') {
+    return await this.gestReservas.marcarTarefaConcluida(idServico, nomeStaff);
   }
 
   async contarFuncionarios() {

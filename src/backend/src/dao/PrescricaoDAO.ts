@@ -133,17 +133,13 @@ export class PrescricaoDAO {
   }
 
   // Regista um check diário da veterinária
-  async registarCheckDiario(idAnimal: string, notas: string) {
-    // 1. Muda o boolean para true para desaparecer da lista de verificações
-    await prisma.animal.update({
-      where: { idAnimal },
-      data: { check: true }
-    });
+  async registarCheckDiario(idAnimal: string, notas: string, nomeVet: string) {
+    await prisma.animal.update({ where: { idAnimal }, data: { check: true } });
 
-    // 2. CRIA um novo registo no diário de bordo com as notas
+    // 👇 A MÁGICA ENTRA AQUI 👇
     return await prisma.diarioBordo.create({
       data: {
-        descricao: `[CHECK VETERINÁRIO] ${notas}`,
+        descricao: `[CHECK CLÍNICO por ${nomeVet}] ${notas}`,
         animalId: idAnimal
       }
     });

@@ -290,7 +290,8 @@ router.get('/tarefas', async (req, res) => {
 
 router.patch('/tarefas/:id/concluir', async (req, res) => {
   try {
-    const tarefa = await gestor.marcarTarefaConcluida(req.params.id);
+    const { nomeStaff } = req.body; // <--- NOVA EXTRAÇÃO AQUI
+    const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff);
     res.json(tarefa);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -356,8 +357,8 @@ router.get('/veterinaria/caes-quarentena', async (req, res) => {
 
 router.post('/veterinaria/check-diario/:idAnimal', async (req, res) => {
   try {
-    const { notas } = req.body;
-    await gestor.registarCheckDiario(req.params.idAnimal, notas);
+    const { notas, nomeVet } = req.body; // <--- NOVA EXTRAÇÃO AQUI
+    await gestor.registarCheckDiario(req.params.idAnimal, notas, nomeVet);
     res.status(201).json({ message: 'Check diário registado com sucesso' });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
