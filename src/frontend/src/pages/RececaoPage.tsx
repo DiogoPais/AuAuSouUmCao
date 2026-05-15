@@ -10,7 +10,7 @@ interface Reserva {
   dataSaida: string;
   estado: string;
   valor: number; 
-  fatura?: { documento: string }; // NOVO: Para podermos aceder ao PDF da fatura
+  fatura?: { documento: string; valorTotal: number; metodoPagamento: string };
   animal: {
     idAnimal: string;
     nome: string;
@@ -68,6 +68,57 @@ const RececaoPage: React.FC = () => {
       console.error(err);
       if (novaAba) novaAba.close();
       alert("Erro ao abrir documento. O acesso pode ter expirado.");
+    }
+  };
+
+  // NOVA FUNÇÃO: Gera um recibo visual na hora sem precisar de ir à nuvem (AWS S3)
+  const handleImprimirFatura = (reserva: Reserva) => {
+    if (!reserva.fatura) return;
+    
+    const novaAba = window.open('', '_blank');
+    if (novaAba) {
+      novaAba.document.write(`
+        <html>
+          <head>
+            <title>Recibo - ${reserva.fatura.documento}</title>
+            <style>
+              body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7DDFD3; padding-bottom: 20px; }
+              .logo { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #7DDFD3; }
+              .details { margin-top: 30px; line-height: 1.6; }
+              .total-box { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #28a745; }
+              .print-btn { margin-top: 40px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+              @media print { .print-btn { display: none; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div>
+                <h1 style="margin:0;">Hotel Canino - AuAuSouUmCão</h1>
+                <p style="margin: 5px 0 0 0; color: #666;">Comprovativo de Pagamento</p>
+              </div>
+              <img src="https://cdn.discordapp.com/attachments/1212044201747816518/1496523823208599603/Gemini_Generated_Image_sebx2ssebx2ssebx.png?ex=69ea31eb&is=69e8e06b&hm=e86093c99b49fbbe0b718a5942cb18caa1e6e79fdf19253b2e252c75d225bb2e" class="logo" />
+            </div>
+            
+            <div class="details">
+              <p><strong>Nº Documento:</strong> ${reserva.fatura.documento}</p>
+              <p><strong>Data de Emissão:</strong> ${new Date(reserva.dataSaida).toLocaleDateString('pt-PT')} às ${new Date(reserva.dataSaida).toLocaleTimeString('pt-PT')}</p>
+              <br/>
+              <p><strong>Tutor / Cliente:</strong> ${reserva.animal.tutor?.utilizador?.nome || 'N/A'}</p>
+              <p><strong>NIF:</strong> ${reserva.animal.tutorNif}</p>
+              <p><strong>Hóspede:</strong> Cão ${reserva.animal.nome} (Raça: ${reserva.animal.raca})</p>
+            </div>
+
+            <div class="total-box">
+              <h2 style="margin: 0 0 10px 0;">Total Pago: ${reserva.fatura.valorTotal.toFixed(2)} €</h2>
+              <p style="margin: 0; color: #555;"><strong>Método de Pagamento:</strong> ${reserva.fatura.metodoPagamento}</p>
+            </div>
+
+            <button class="print-btn" onclick="window.print()">🖨️ Imprimir Recibo</button>
+          </body>
+        </html>
+      `);
+      novaAba.document.close();
     }
   };
 
@@ -391,12 +442,13 @@ const RececaoPage: React.FC = () => {
                       <td>{r.animal.tutor?.utilizador?.nome || 'Dono não encontrado'}</td>
                       <td>{new Date(r.dataSaida).toLocaleDateString('pt-PT')}</td>
                       <td>
+                        {/* AQUI ESTÁ A CORREÇÃO: Botão chama o novo visualizador de recibos */}
                         {r.fatura?.documento ? (
                           <button 
-                            onClick={() => handleAbrirPdf(r.fatura!.documento)} 
+                            onClick={() => handleImprimirFatura(r)} 
                             style={{ background: '#e3f2fd', color: '#007bff', border: '1px solid #007bff', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                           >
-                            📄 Sacar Fatura
+                            📄 Imprimir Recibo
                           </button>
                         ) : (
                           <span style={{ color: '#888' }}>Fatura Indisponível</span>

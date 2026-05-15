@@ -214,13 +214,23 @@ export class PrescricaoDAO {
     return animalAtualizado;
   }
 
-  // Lista cães em quarentena
+  // Lista cães em quarentena (MAS SÓ OS QUE ESTÃO NO HOTEL!)
   async listarEmQuarentena() {
     return await prisma.animal.findMany({
-      where: { estado: 'Quarentena' },
+      where: { 
+        estado: 'Quarentena',
+        // 👇 A MÁGICA ENTRA AQUI: Só mostra se o cão estiver fisicamente no hotel
+        reservas: {
+          some: { estado: 'CheckIn' }
+        }
+      },
       include: {
         tutor: { include: { utilizador: true } },
-        diarioBordo: { orderBy: { timestamp: 'desc' }, take: 5 }
+        diarioBordo: { orderBy: { timestamp: 'desc' }, take: 5 },
+        reservas: {
+          where: { estado: 'CheckIn' },
+          include: { box: true }
+        }
       }
     });
   }

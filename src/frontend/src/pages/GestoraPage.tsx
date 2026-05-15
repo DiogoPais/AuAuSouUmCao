@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  FileText, Download, DollarSign, Activity, Printer, ArrowLeft, ShieldCheck, FileSearch, Building, CalendarDays, Package, AlertTriangle, Eye, BellRing
+  FileText, Download, DollarSign, Activity, Printer, ArrowLeft, ShieldCheck, FileSearch, Building, CalendarDays, Package, AlertTriangle, Eye, BellRing, Search, X
 } from 'lucide-react';
 import Header from '../components/Header';
 import './GestoraPage.css';
@@ -53,8 +53,12 @@ const GestoraPage: React.FC = () => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // NOVO: Estado para ver os cães num dia específico do calendário
+  // Estados do Calendário
   const [diaDetalheSelecionado, setDiaDetalheSelecionado] = useState<{data: string, caes: any[]} | null>(null);
+
+  // NOVOS ESTADOS: Filtros da Auditoria
+  const [filtroAnimal, setFiltroAnimal] = useState('');
+  const [filtroData, setFiltroData] = useState('');
 
   const gestora = {
     nome: localStorage.getItem('user_nome') || 'Gestora',
@@ -103,7 +107,7 @@ const GestoraPage: React.FC = () => {
   // ==========================================
   // CÁLCULOS: OCUPAÇÃO E AVISOS
   // ==========================================
-  const alertasDeStock = stock.filter(s => s.quantidade <= 10); // Ração e medicamentos em baixo
+  const alertasDeStock = stock.filter(s => s.quantidade <= 10);
 
   const calcularOcupacao = () => {
     const dias = [];
@@ -135,9 +139,17 @@ const GestoraPage: React.FC = () => {
   const totalIVA = totalFaturado * 0.23; 
   const receitaLiquida = totalFaturado - totalIVA;
 
+  // LÓGICA DE FILTRAGEM DOS LOGS
+  const logsFiltrados = logs.filter(log => {
+    const matchAnimal = filtroAnimal ? log.animal?.nome?.toLowerCase().includes(filtroAnimal.toLowerCase()) : true;
+    const logDataStr = new Date(log.timestamp).toISOString().split('T')[0];
+    const matchData = filtroData ? logDataStr === filtroData : true;
+    return matchAnimal && matchData;
+  });
+
   const exportarCSV = () => {
     let csvContent = "Data,Hora,Animal,Incidente/Descrição\n";
-    logs.forEach(log => {
+    logsFiltrados.forEach(log => {
       const data = new Date(log.timestamp).toLocaleDateString('pt-PT');
       const hora = new Date(log.timestamp).toLocaleTimeString('pt-PT');
       const descSegura = log.descricao.replace(/,/g, ' '); 
@@ -165,6 +177,8 @@ const GestoraPage: React.FC = () => {
       <div className="print-only" style={{ display: 'none', textAlign: 'center', marginBottom: '20px' }}>
         <h2>Relatório de Incidentes e Auditoria - Hotel Canino</h2>
         <p>Data de Emissão: {new Date().toLocaleDateString('pt-PT')}</p>
+        {filtroData && <p>Filtro de Data: {new Date(filtroData).toLocaleDateString('pt-PT')}</p>}
+        {filtroAnimal && <p>Filtro de Cão: {filtroAnimal}</p>}
         <hr />
       </div>
 
@@ -193,7 +207,6 @@ const GestoraPage: React.FC = () => {
           <section className="gestora-section no-print">
             <h2 style={{ marginBottom: '20px', color: '#333' }}>Visão Geral Operacional</h2>
             
-            {/* NOVO: SECÇÃO DE ALERTAS */}
             {alertasDeStock.length > 0 && (
               <div style={{ background: '#fff3cd', borderLeft: '5px solid #ffc107', padding: '15px 20px', borderRadius: '4px', marginBottom: '20px' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#856404', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -220,10 +233,9 @@ const GestoraPage: React.FC = () => {
                     return (
                       <div 
                         key={i} 
-                        onClick={() => setDiaDetalheSelecionado({ data: nomeDia, caes: d.caes })}
-                        style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa', borderRadius: '6px', borderLeft: d.ocupados >= 35 ? '4px solid #ffc107' : '4px solid #28a745', cursor: 'pointer', transition: 'background 0.2s' }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#e2e6ea'}
-                        onMouseOut={(e) => e.currentTarget.style.background = d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa'}
+                        // SOLUÇÃO PONTO 2: Clicar no mesmo dia fecha o painel. Clicar noutro abre.
+                        onClick={() => setDiaDetalheSelecionado(diaDetalheSelecionado?.data === nomeDia ? null : { data: nomeDia, caes: d.caes })}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: diaDetalheSelecionado?.data === nomeDia ? '#e2e6ea' : (d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa'), borderRadius: '6px', borderLeft: d.ocupados >= 35 ? '4px solid #ffc107' : '4px solid #28a745', cursor: 'pointer', transition: 'background 0.2s' }}
                       >
                         <span style={{ fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {nomeDia} <Eye size={16} color="#0066cc" />
@@ -240,16 +252,18 @@ const GestoraPage: React.FC = () => {
                 <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', border: '2px solid #0066cc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
                     <h3 style={{ margin: 0, color: '#0066cc' }}>Animais - {diaDetalheSelecionado.data}</h3>
-                    <button onClick={() => setDiaDetalheSelecionado(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>X</button>
+                    <button onClick={() => setDiaDetalheSelecionado(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', fontWeight: 'bold', color: '#666' }}>
+                      <X size={20} />
+                    </button>
                   </div>
                   <ul style={{ listStyle: 'none', padding: 0, margin: '15px 0 0 0', maxHeight: '350px', overflowY: 'auto' }}>
                     {diaDetalheSelecionado.caes.length > 0 ? diaDetalheSelecionado.caes.map((cao, index) => (
                       <li key={index} style={{ padding: '8px 10px', borderBottom: '1px dashed #ccc', fontSize: '14px' }}>
-                        <strong>{cao.nome}</strong> (Box {cao.box}) <br/>
+                        <strong>{cao.nome}</strong> (Box {cao.box || 'N/A'}) <br/>
                         <small style={{ color: '#666' }}>Tutor: {cao.dono || 'N/A'}</small>
                       </li>
                     )) : (
-                      <p style={{ textAlign: 'center', color: '#888' }}>Nenhum cão previsto para este dia.</p>
+                      <p style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Nenhum cão previsto para este dia.</p>
                     )}
                   </ul>
                 </div>
@@ -343,7 +357,7 @@ const GestoraPage: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* ABA 2: AUDITORIA E LOGS (AGORA MOSTRA O NOME)  */}
+        {/* ABA 2: AUDITORIA E LOGS COM FILTROS            */}
         {/* ============================================== */}
         {activeTab === 'LOGS' && (
           <section className="logs-section">
@@ -366,6 +380,37 @@ const GestoraPage: React.FC = () => {
               </div>
             </div>
 
+            {/* SOLUÇÃO PONTO 5: BARRA DE FILTROS DOS LOGS */}
+            <div className="no-print" style={{ display: 'flex', gap: '15px', marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '200px' }}>
+                <Search size={18} color="#666" />
+                <input 
+                  type="text" 
+                  placeholder="Procurar por nome do Cão..." 
+                  value={filtroAnimal}
+                  onChange={(e) => setFiltroAnimal(e.target.value)}
+                  style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ fontSize: '14px', color: '#666', fontWeight: 'bold' }}>Data exata:</label>
+                <input 
+                  type="date" 
+                  value={filtroData}
+                  onChange={(e) => setFiltroData(e.target.value)}
+                  style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+              </div>
+              {(filtroAnimal || filtroData) && (
+                <button 
+                  onClick={() => { setFiltroAnimal(''); setFiltroData(''); }}
+                  style={{ background: 'transparent', border: 'none', color: '#dc3545', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' }}
+                >
+                  <X size={16} /> Limpar
+                </button>
+              )}
+            </div>
+
             <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '20px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead style={{ background: '#f8f9fa' }}>
@@ -376,7 +421,7 @@ const GestoraPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.length > 0 ? logs.map(log => {
+                  {logsFiltrados.length > 0 ? logsFiltrados.map(log => {
                     const isAlerta = log.descricao.includes('🚨') || log.descricao.includes('[CHECK');
                     return (
                       <tr key={log.idRegisto} style={{ borderBottom: '1px solid #eee', backgroundColor: isAlerta ? '#fffaf0' : 'transparent' }}>
@@ -386,7 +431,7 @@ const GestoraPage: React.FC = () => {
                       </tr>
                     );
                   }) : (
-                    <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhum log registado.</td></tr>
+                    <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#888' }}>Nenhum log encontrado com os filtros atuais.</td></tr>
                   )}
                 </tbody>
               </table>

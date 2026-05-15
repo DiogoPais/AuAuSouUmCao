@@ -45,7 +45,7 @@ const VeterinariaPage: React.FC = () => {
   const [tratamentosAtivos, setTratamentosAtivos] = useState<any[]>([]);
   const [agora, setAgora] = useState(new Date());
 
-  // ESTADOS DA NOVA RECEITA (OPÇÃO B - LISTA ACUMULATIVA)
+  // ESTADOS DA NOVA RECEITA
   const [animalSelecionadoParaReceita, setAnimalSelecionadoParaReceita] = useState('');
   const [linhasReceita, setLinhasReceita] = useState<any[]>([]);
   const [linhaAtual, setLinhaAtual] = useState({
@@ -57,17 +57,15 @@ const VeterinariaPage: React.FC = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-  // O Motor do Countdown
   useEffect(() => {
     const fetchDados = async () => {
       try {
         setLoading(true);
-        // BUG 8: Trocámos a chamada /api/animais por /api/reservas
         const [resVerificar, resQuarentena, resStock, resReservas, resTratamentos] = await Promise.all([
           axios.get(`${API_URL}/api/veterinaria/caes-para-verificar`),
           axios.get(`${API_URL}/api/veterinaria/caes-quarentena`),
           axios.get(`${API_URL}/api/stock`),
-          axios.get(`${API_URL}/api/reservas`), // <-- MUDANÇA AQUI
+          axios.get(`${API_URL}/api/reservas`), 
           axios.get(`${API_URL}/api/veterinaria/tratamentos-ativos`)
         ]);
         
@@ -75,15 +73,13 @@ const VeterinariaPage: React.FC = () => {
         setCaesQuarentena(resQuarentena.data);
         setTratamentosAtivos(resTratamentos.data);
         
-        // BUG 8 RESOLVIDO: Filtra apenas as reservas 'CheckIn' e extrai os animais delas!
         const caesInternados = resReservas.data
           .filter((r: any) => r.estado === 'CheckIn')
           .map((r: any) => r.animal);
 
-        // Removemos duplicados (se existirem) para a dropdown ficar limpa
         const caesUnicos = Array.from(new Map(caesInternados.map((c: any) => [c.idAnimal, c])).values()) as Animal[];
         
-        setTodosAnimais(caesUnicos); // Agora o dropdown da receita SÓ tem cães no hotel!
+        setTodosAnimais(caesUnicos); 
         
         const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
         setMedicamentos(apenasMedicamentos);
@@ -110,42 +106,13 @@ const VeterinariaPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchDados = async () => {
-      try {
-        setLoading(true);
-        const [resVerificar, resQuarentena, resStock, resAnimais, resTratamentos] = await Promise.all([
-          axios.get(`${API_URL}/api/veterinaria/caes-para-verificar`),
-          axios.get(`${API_URL}/api/veterinaria/caes-quarentena`),
-          axios.get(`${API_URL}/api/stock`),
-          axios.get(`${API_URL}/api/animais`),
-          axios.get(`${API_URL}/api/veterinaria/tratamentos-ativos`)
-        ]);
-        
-        setCaesParaVerificar(resVerificar.data);
-        setCaesQuarentena(resQuarentena.data);
-        setTodosAnimais(resAnimais.data);
-        setTratamentosAtivos(resTratamentos.data);
-        
-        const apenasMedicamentos = resStock.data.filter((item: any) => item.tipo === 'Medicamento');
-        setMedicamentos(apenasMedicamentos);
-      } catch (err) {
-        console.error('Erro ao buscar dados:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDados();
-  }, []);
-
-  // FUNÇÕES PADRÃO (Check e Quarentena)...
   const handleFinalizarCheck = async () => {
     if (!caesSelecionado || !notasCheck.trim()) {
       alert('Por favor, preencha as notas do check.');
       return;
     }
     try {
-      await axios.post(`${API_URL}/api/veterinaria/check-diario/${caesSelecionado.idAnimal}`, { notas: notasCheck });
+      await axios.post(`${API_URL}/api/veterinaria/check-diario/${caesSelecionado.idAnimal}`, { notas: notasCheck, nomeVet: vet.nome });
       alert('Check realizado com sucesso!');
       setCaesParaVerificar(caesParaVerificar.filter(c => c.idAnimal !== caesSelecionado.idAnimal));
       setCaesSelecionado(null);
@@ -177,7 +144,22 @@ const VeterinariaPage: React.FC = () => {
   };
 
   // ==========================================
-  // LÓGICA DA OPÇÃO B (RECEITA AVANÇADA)
+  // NOVA FUNÇÃO: DAR ALTA DA QUARENTENA
+  // ==========================================
+  const terminarQuarentena = async (idAnimal: string) => {
+    if (!window.confirm("Tem a certeza que deseja dar Alta Médica a este cão?")) return;
+    try {
+      await axios.patch(`${API_URL}/api/veterinaria/quarentena/${idAnimal}`, { ativar: false });
+      alert('Alta médica dada com sucesso! O cão saiu da quarentena.');
+      // Remove o cão da lista de quarentena do ecrã
+      setCaesQuarentena(caesQuarentena.filter(c => c.idAnimal !== idAnimal));
+    } catch (err) {
+      alert('Erro ao dar alta médica.');
+    }
+  };
+
+  // ==========================================
+  // LÓGICA DA RECEITA AVANÇADA
   // ==========================================
   const handleAdicionarLinha = () => {
     if (!linhaAtual.medicamentoId || !linhaAtual.dosagem || !linhaAtual.frequencia || !linhaAtual.totalDoses) {
@@ -246,9 +228,10 @@ const VeterinariaPage: React.FC = () => {
   };
 
   const handleFinalizarTratamento = async (idLinha: string) => {
-    if (!window.confirm("Forçar finalização deste tratamento? Ele desaparecerá da lista.")) return;
+    if (!window.confirm("Confirmas que queres parar / concluir este tratamento? Ele desaparecerá da lista.")) return;
     try {
       await axios.patch(`${API_URL}/api/veterinaria/tratamentos/${idLinha}/finalizar`);
+      alert('Tratamento concluído!');
       await carregarTratamentosAtivos(); 
     } catch (err: any) {
       alert(err.response?.data?.error || 'Erro ao finalizar tratamento.');
@@ -388,17 +371,25 @@ const VeterinariaPage: React.FC = () => {
                 {caesQuarentena.length > 0 ? (
                   caesQuarentena.map(cao => (
                     <div key={cao.idAnimal} className="cao-card quarentena-card">
-                      <div className="cao-header">
-                        <h3>{cao.nome}</h3>
-                        <span className="badge-quarentena">QUARENTENA</span>
+                      <div className="cao-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <h3>{cao.nome}</h3>
+                          <span className="badge-quarentena" style={{ display: 'inline-block', marginBottom: '10px' }}>QUARENTENA</span>
+                        </div>
+                        {/* AQUI ESTÁ O NOVO BOTÃO DE ALTA MÉDICA */}
+                        <button 
+                          onClick={() => terminarQuarentena(cao.idAnimal)} 
+                          style={{ background: '#28a745', color: 'white', padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        >
+                          <CheckCircle size={16} /> Dar Alta
+                        </button>
                       </div>
                       <p className="cao-info">Raça: {cao.raca || 'N/A'}</p>
                       <p className="cao-info">Tutor: {cao.tutor?.utilizador?.nome || 'N/A'}</p>
-                      <p className="cao-info">Estado: {cao.estado}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="vazio">Nenhum cão em quarentena</p>
+                  <p className="vazio">Nenhum cão em quarentena neste momento. 🎉</p>
                 )}
               </div>
             </section>
@@ -550,8 +541,14 @@ const VeterinariaPage: React.FC = () => {
                                   >
                                     <Check size={16} /> Dar Dose
                                   </button>
-                                  <button onClick={() => handleFinalizarTratamento(tratamento.idLinha)} style={{ padding: '8px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                                    <XCircle size={16} />
+
+                                  {/* AQUI ESTÁ O BOTÃO DE PARAR TRATAMENTO MELHORADO */}
+                                  <button 
+                                    onClick={() => handleFinalizarTratamento(tratamento.idLinha)} 
+                                    style={{ padding: '8px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                    title="Concluir / Parar Tratamento"
+                                  >
+                                    <XCircle size={16} /> Parar
                                   </button>
                                 </td>
                               </tr>
@@ -569,9 +566,6 @@ const VeterinariaPage: React.FC = () => {
             </section>
           )}
 
-          {/* ========================================== */}
-          {/* BOTÃO DE VOLTAR - APENAS PARA A GESTORA    */}
-          {/* ========================================== */}
           {vet.perfil === 'Admin' && (
             <div style={{ marginTop: '30px', padding: '20px 0' }}>
               <button 

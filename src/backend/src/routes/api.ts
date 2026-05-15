@@ -41,74 +41,60 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
     if(utilizador.tutor){
-    // Gerar código 2FA
-    const code = generate2FACode();
-    store2FACode(utilizador.email, code);
+      // Gerar código 2FA
+      const code = generate2FACode();
+      store2FACode(utilizador.email, code);
 
-    // Enviar email com o código
-    try {
-
-      const emailTexto = `O seu código de confirmação é: ${code}. Este código expira em 10 minutos.`;
-
-      const emailHTML = `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; text-align: center; border: 1px solid #eaeaea; border-radius: 10px; padding: 30px; color: #333;">
-          <h2 style="color: #333;">Verificação de Segurança</h2>
-          <p style="font-size: 16px;">Olá!</p>
-          <p style="font-size: 16px;">Alguém tentou iniciar sessão na sua conta <strong>AuAuSouUmCão</strong>. Utilize o código abaixo para confirmar a sua identidade:</p>
-          
-          <div style="margin: 30px 0;">
-            <span style="font-size: 40px; font-weight: bold; letter-spacing: 10px; color: #333; background-color: #f4f4f4; padding: 20px 30px; border-radius: 8px; border: 2px dashed #7DDFD3;">
-              ${code}
-            </span>
+      // Enviar email com o código
+      try {
+        const emailTexto = `O seu código de confirmação é: ${code}. Este código expira em 10 minutos.`;
+        const emailHTML = `
+          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; text-align: center; border: 1px solid #eaeaea; border-radius: 10px; padding: 30px; color: #333;">
+            <h2 style="color: #333;">Verificação de Segurança</h2>
+            <p style="font-size: 16px;">Olá!</p>
+            <p style="font-size: 16px;">Alguém tentou iniciar sessão na sua conta <strong>AuAuSouUmCão</strong>. Utilize o código abaixo para confirmar a sua identidade:</p>
+            <div style="margin: 30px 0;">
+              <span style="font-size: 40px; font-weight: bold; letter-spacing: 10px; color: #333; background-color: #f4f4f4; padding: 20px 30px; border-radius: 8px; border: 2px dashed #7DDFD3;">
+                ${code}
+              </span>
+            </div>
+            <p style="color: #888; font-size: 14px;">Este código é válido durante <strong>10 minutos</strong>.</p>
+            <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+            <p style="color: #aaa; font-size: 12px;">Se não tentou iniciar sessão, ignore este email.</p>
           </div>
-          
-          <p style="color: #888; font-size: 14px;">Este código é válido durante <strong>10 minutos</strong>.</p>
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-          <p style="color: #aaa; font-size: 12px;">Se não tentou iniciar sessão, ignore este email.</p>
-        </div>
-      `;
+        `;
+        await sendEmail(utilizador.email, 'Código de Confirmação 2FA - AuAuSouUmCão', emailTexto, emailHTML);
+      } catch (emailError) {
+        console.error('Erro ao enviar email:', emailError);
+        return res.status(500).json({ error: 'Erro ao enviar código de confirmação.' });
+      }
 
+      res.status(200).json({
+        requires2FA: true,
+        email: utilizador.email,
+        message: 'Código de confirmação enviado para o seu email.'
+      });
+    } else {
+      // Quando criamos verificacao com email reais para o staff e tal
+      const utilizadorR = await gestor.obterUtilizadorPorEmail(username);
+      if (!utilizadorR) {
+        return res.status(404).json({ error: 'Utilizador não encontrado.' });
+      }
 
-      
-      await sendEmail(
-        utilizador.email,
-        'Código de Confirmação 2FA - AuAuSouUmCão',
-        emailTexto,
-        emailHTML
+      const roleReal = utilizadorR.funcionario ? utilizadorR.funcionario.perfil : 'Tutor';
+      const token = jwt.sign(
+        { userId: utilizadorR.idUtilizador, role: roleReal },
+        process.env.JWT_SECRET || 'chave_secreta_hotel_canino_2026',
+          { expiresIn: '8h' }
       );
-    } catch (emailError) {
-      console.error('Erro ao enviar email:', emailError);
-      return res.status(500).json({ error: 'Erro ao enviar código de confirmação.' });
+      
+      res.status(200).json({
+        message: `Bem-vindo, ${utilizadorR.nome}!`,
+        token, role: roleReal, nome: utilizadorR.nome,
+        userId: utilizadorR.idUtilizador,
+        nif: utilizadorR.tutor?.nif || '---'
+      });
     }
-    
-
-    res.status(200).json({
-      requires2FA: true,
-      email: utilizador.email,
-      message: 'Código de confirmação enviado para o seu email.'
-    });
-  } else {
-    // Quando criamos verificacao com email reais para o staff e tal
-
-    const utilizadorR = await gestor.obterUtilizadorPorEmail(username);
-    if (!utilizadorR) {
-      return res.status(404).json({ error: 'Utilizador não encontrado.' });
-    }
-
-    const roleReal = utilizadorR.funcionario ? utilizadorR.funcionario.perfil : 'Tutor';
-    const token = jwt.sign(
-      { userId: utilizadorR.idUtilizador, role: roleReal },
-      process.env.JWT_SECRET || 'chave_secreta_hotel_canino_2026',
-        { expiresIn: '8h' }
-    );
-    
-    res.status(200).json({
-      message: `Bem-vindo, ${utilizadorR.nome}!`,
-      token, role: roleReal, nome: utilizadorR.nome,
-      userId: utilizadorR.idUtilizador,
-      nif: utilizadorR.tutor?.nif || '---'
-    });
-  }
   } catch (error: any) {
     res.status(500).json({ error: 'Erro no servidor.' });
   }
@@ -159,8 +145,6 @@ router.get('/documentos/ver/:chave(*)', async (req: Request, res: Response) => {
   try {
     const { chave } = req.params;
     const urlTemporaria = await s3Adapter.gerarLinkTemporario(chave);
-    
-    // MUDANÇA AQUI: Devolvemos a URL no formato JSON em vez de fazer redirect
     res.json({ url: urlTemporaria }); 
   } catch (error: any) {
     res.status(404).json({ error: "Documento não encontrado ou acesso expirado." });
@@ -195,8 +179,6 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
     
     const { boletimVacinasUrl, ...dadosLimposParaA_BD } = req.body;
     
-    // 👇 A CORREÇÃO ENTRA AQUI 👇
-    // Converte a string do FormData para número real (Float)
     if (dadosLimposParaA_BD.doseDiaria) {
       dadosLimposParaA_BD.doseDiaria = parseFloat(dadosLimposParaA_BD.doseDiaria);
     }
@@ -213,7 +195,7 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
   }
 });
 
-// RESERVAS E RESTANTES ROTAS
+// RESERVAS
 router.get('/reservas', async (req, res) => {
   const reservas = await gestor.listarReservas();
   res.json(reservas);
@@ -221,22 +203,19 @@ router.get('/reservas', async (req, res) => {
 
 router.post('/reservas', async (req: Request, res: Response) => {
   try {
-    const { banhos, tosquias, passeios, idAnimal, ...resto } = req.body;
+    // 👇 SOLUÇÃO DOS SERVIÇOS DO STAFF: Não extraímos os banhos aqui.
+    // Assim eles passam diretamente dentro de "resto" (dadosReserva) para a Facade!
+    const { idAnimal, ...resto } = req.body;
     const dadosReserva = { ...resto, animalId: idAnimal };
     
-    const servicos: any[] = [];
-    if (banhos > 0) for(let i=0; i<banhos; i++) servicos.push({ tipo: 'Adestramento', preco: 20, data: new Date() });
-    if (tosquias > 0) for(let i=0; i<tosquias; i++) servicos.push({ tipo: 'Grooming', preco: 10, data: new Date() });
-    if (passeios > 0) for(let i=0; i<passeios; i++) servicos.push({ tipo: 'Passeio', preco: 10, data: new Date() });
-
-    const reserva = await gestor.efetuarReserva(dadosReserva, servicos);
+    const reserva = await gestor.efetuarReserva(dadosReserva, []);
     res.status(201).json(reserva);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// ROTA DO CHECK-IN (Corrigida: sem o /api no início)
+// ROTA DO CHECK-IN
 router.patch('/reservas/:id/checkin', async (req, res) => {
   try {
     const { termosAceites } = req.body; 
@@ -247,7 +226,7 @@ router.patch('/reservas/:id/checkin', async (req, res) => {
   }
 });
 
-// ROTA DO CHECK-OUT (Corrigida: sem o /api no início)
+// ROTA DO CHECK-OUT
 router.patch('/reservas/:id/checkout', async (req, res) => {
   try {
     const { metodoPagamento } = req.body; 
@@ -279,6 +258,7 @@ router.patch('/plano-vacinal/:idAnimal', async (req, res) => {
   }     
 });
 
+// TAREFAS (STAFF)
 router.get('/tarefas', async (req, res) => {
   try {
     const tarefas = await gestor.listarTarefasDoDia();
@@ -288,9 +268,10 @@ router.get('/tarefas', async (req, res) => {
   }
 });
 
-router.patch('/tarefas/:id/concluir', async (req, res) => {
+router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, res) => {
   try {
-    const { nomeStaff } = req.body; // <--- NOVA EXTRAÇÃO AQUI
+    // 👇 SOLUÇÃO ASSINATURAS NOS LOGS (STAFF)
+    const { nomeStaff } = req.body; 
     const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff);
     res.json(tarefa);
   } catch (error: any) {
@@ -357,7 +338,8 @@ router.get('/veterinaria/caes-quarentena', async (req, res) => {
 
 router.post('/veterinaria/check-diario/:idAnimal', async (req, res) => {
   try {
-    const { notas, nomeVet } = req.body; // <--- NOVA EXTRAÇÃO AQUI
+    // 👇 SOLUÇÃO ASSINATURAS NOS LOGS (VET)
+    const { notas, nomeVet } = req.body;
     await gestor.registarCheckDiario(req.params.idAnimal, notas, nomeVet);
     res.status(201).json({ message: 'Check diário registado com sucesso' });
   } catch (error: any) {
@@ -431,7 +413,6 @@ router.get('/veterinaria/tratamentos-ativos', async (req, res) => {
 
 router.post('/veterinaria/tratamentos/:idLinha/administrar', async (req, res) => {
   try {
-    // Usar o ID do utilizador que vem no token JWT gerado no login
     const idFuncionario = (req as any).user?.userId || req.body.funcionarioId;
     
     if (!idFuncionario) {
@@ -454,10 +435,11 @@ router.patch('/veterinaria/tratamentos/:idLinha/finalizar', async (req, res) => 
   }
 });
 
+// ==========================================
 // ROTAS DA GESTORA
+// ==========================================
 router.get('/faturas', async (req, res) => {
   try {
-    // Nota: Deves adicionar listarFaturas() no GestorHotelFacade que chame o FaturaDAO.findAll()
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     const faturas = await prisma.faturas.findMany({ orderBy: { idFaturas: 'desc' }});
