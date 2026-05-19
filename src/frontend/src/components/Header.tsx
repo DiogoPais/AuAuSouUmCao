@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut, LogIn } from 'lucide-react'; // Importamos o LogIn também
 import { Link, useNavigate } from 'react-router-dom';
 import './Shared.css';
+import logoImg from '../../foto.png';
 
 interface HeaderProps {
   title?: string;
@@ -31,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ title, userData }) => {
     <header className="site-header" style={{ height: '130px', padding: '0 0px' }}>
       <Link to="/" className="logo-container">
         <img 
-          src="../../foto.png" 
+          src={logoImg} 
           alt="Logo"
           style={{ width: '250px', height: '130px' }}
         />
