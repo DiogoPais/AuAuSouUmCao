@@ -17,16 +17,9 @@ class GestClinicaFacade {
     // PRESCRIÇÃO E STOCK
     // ==========================================
     async prescreverMedicacao(dadosPrescricao) {
-        // dadosPrescricao = { animalId, funcionarioId (opcional), linhas: [{ medicamentoId, dosagem, frequencia }] }
         if (!dadosPrescricao.linhas || dadosPrescricao.linhas.length === 0) {
             throw new Error("A prescrição deve conter pelo menos um medicamento.");
         }
-        for (const linha of dadosPrescricao.linhas) {
-            if (linha.dosagem <= 0) {
-                throw new Error("A dosagem clínica deve ser superior a zero.");
-            }
-        }
-        // Se não houver funcionarioId, busca o primeiro funcionário Vet da BD
         if (!dadosPrescricao.funcionarioId) {
             const funcionarioDefault = await this.prescricaoDAO.buscarPrimeiroFuncionarioVet();
             if (!funcionarioDefault) {
@@ -34,33 +27,47 @@ class GestClinicaFacade {
             }
             dadosPrescricao.funcionarioId = funcionarioDefault.idFuncionario;
         }
-        // 1. Criar a Prescrição (O DAO trata do Nested Write)
-        const novaPrescricao = await this.prescricaoDAO.create(dadosPrescricao);
-        // 2. Descontar o Stock usando o StockDAO
+        const deducoesPendentes = [];
+        // 1. Validar e converter Nomes em IDs
+        // Substitui o "for (const linha of dadosPrescricao.linhas)" por isto:
         for (const linha of dadosPrescricao.linhas) {
-            const med = await this.stockDAO.findMedicamentoComStock(linha.medicamentoId);
-            if (med && med.stock) {
-                const novaQuantidade = Math.max(0, med.stock.quantidade - linha.dosagem);
-                await this.stockDAO.updateQuantidade(med.stockId, novaQuantidade);
+            if (linha.dosagem <= 0 || linha.totalDoses <= 0) {
+                throw new Error("A dosagem e o total de doses devem ser superiores a zero.");
             }
+            const stockItem = await this.stockDAO.findItemPorNome(linha.medicamentoId);
+            if (!stockItem || !stockItem.medicamento) {
+                throw new Error(`Medicamento '${linha.medicamentoId}' não encontrado no stock.`);
+            }
+            // CALCULA O STOCK A DESCONTAR: (ex: toma 2 pilulas * 5 vezes = desconta 10 do stock)
+            const quantidadeTotalGasta = linha.dosagem * linha.totalDoses;
+            if (stockItem.quantidade < quantidadeTotalGasta) {
+                throw new Error(`Stock insuficiente para '${stockItem.nome}'. O tratamento total precisa de ${quantidadeTotalGasta}, mas o stock atual é ${stockItem.quantidade}.`);
+            }
+            linha.medicamentoId = stockItem.medicamento.idMedicamento;
+            deducoesPendentes.push({
+                stockId: stockItem.idItem,
+                novaQuantidade: stockItem.quantidade - quantidadeTotalGasta
+            });
+        }
+        // 2. Criar a Prescrição
+        const novaPrescricao = await this.prescricaoDAO.create(dadosPrescricao);
+        // 3. Descontar o Stock
+        for (const deducao of deducoesPendentes) {
+            await this.stockDAO.updateQuantidade(deducao.stockId, deducao.novaQuantidade);
         }
         return novaPrescricao;
     }
     async listarStockCompleto() {
         return await this.stockDAO.findAll();
     }
-    async registarAdministracaoFoco(funcionarioId) {
-        return await this.logsDAO.createLog(funcionarioId);
-    }
     // ==========================================
     // GESTÃO DE CHECKS DIÁRIOS E QUARENTENA
     // ==========================================
-    async registarCheckDiario(idAnimal, notas) {
+    async registarCheckDiario(idAnimal, notas, nomeVet = 'Veterinário(a)') {
         if (!notas || notas.trim().length === 0) {
             throw new Error("O check deve incluir notas do veterinário.");
         }
-        // Delega para o DAO (que vai mudar o 'check' para true e adicionar ao DiarioBordo)
-        return await this.prescricaoDAO.registarCheckDiario(idAnimal, notas);
+        return await this.prescricaoDAO.registarCheckDiario(idAnimal, notas, nomeVet);
     }
     async listarCaesParaVerificar() {
         return await this.prescricaoDAO.listarCaesParaVerificar();
@@ -82,6 +89,21 @@ class GestClinicaFacade {
     }
     async listarPrescricoesAnimal(animalId) {
         return await this.prescricaoDAO.findByAnimal(animalId);
+    }
+    // ==========================================
+    // GESTÃO DE TRATAMENTOS E LOGS
+    // ==========================================
+    async listarTratamentosAtivos() {
+        return await this.prescricaoDAO.listarTratamentosAtivos();
+    }
+    async registarAdministracao(idLinha, idFuncionario) {
+        if (!idLinha || !idFuncionario) {
+            throw new Error("Dados incompletos para registar administração.");
+        }
+        return await this.prescricaoDAO.registarAdministracao(idLinha, idFuncionario);
+    }
+    async finalizarTratamento(idLinha) {
+        return await this.prescricaoDAO.finalizarTratamento(idLinha);
     }
 }
 exports.GestClinicaFacade = GestClinicaFacade;

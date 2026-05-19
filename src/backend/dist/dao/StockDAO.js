@@ -22,5 +22,17 @@ class StockDAO {
             include: { stock: true }
         });
     }
+    async findItemPorNome(nome) {
+        return await prisma.stock.findFirst({
+            where: { nome: nome },
+            include: { medicamento: true }
+        });
+    }
+    // 👇 NOVA FUNÇÃO ADICIONADA PARA O ALGORITMO DA RAÇÃO 👇
+    async findById(idItem) {
+        return await prisma.stock.findUnique({
+            where: { idItem: idItem }
+        });
+    }
 }
 exports.StockDAO = StockDAO;

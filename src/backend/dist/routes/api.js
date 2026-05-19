@@ -47,22 +47,20 @@ router.post('/login', async (req, res) => {
             try {
                 const emailTexto = `O seu código de confirmação é: ${code}. Este código expira em 10 minutos.`;
                 const emailHTML = `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; text-align: center; border: 1px solid #eaeaea; border-radius: 10px; padding: 30px; color: #333;">
-          <h2 style="color: #333;">Verificação de Segurança</h2>
-          <p style="font-size: 16px;">Olá!</p>
-          <p style="font-size: 16px;">Alguém tentou iniciar sessão na sua conta <strong>AuAuSouUmCão</strong>. Utilize o código abaixo para confirmar a sua identidade:</p>
-          
-          <div style="margin: 30px 0;">
-            <span style="font-size: 40px; font-weight: bold; letter-spacing: 10px; color: #333; background-color: #f4f4f4; padding: 20px 30px; border-radius: 8px; border: 2px dashed #7DDFD3;">
-              ${code}
-            </span>
+          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; text-align: center; border: 1px solid #eaeaea; border-radius: 10px; padding: 30px; color: #333;">
+            <h2 style="color: #333;">Verificação de Segurança</h2>
+            <p style="font-size: 16px;">Olá!</p>
+            <p style="font-size: 16px;">Alguém tentou iniciar sessão na sua conta <strong>AuAuSouUmCão</strong>. Utilize o código abaixo para confirmar a sua identidade:</p>
+            <div style="margin: 30px 0;">
+              <span style="font-size: 40px; font-weight: bold; letter-spacing: 10px; color: #333; background-color: #f4f4f4; padding: 20px 30px; border-radius: 8px; border: 2px dashed #7DDFD3;">
+                ${code}
+              </span>
+            </div>
+            <p style="color: #888; font-size: 14px;">Este código é válido durante <strong>10 minutos</strong>.</p>
+            <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+            <p style="color: #aaa; font-size: 12px;">Se não tentou iniciar sessão, ignore este email.</p>
           </div>
-          
-          <p style="color: #888; font-size: 14px;">Este código é válido durante <strong>10 minutos</strong>.</p>
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-          <p style="color: #aaa; font-size: 12px;">Se não tentou iniciar sessão, ignore este email.</p>
-        </div>
-      `;
+        `;
                 await (0, EmailService_1.sendEmail)(utilizador.email, 'Código de Confirmação 2FA - AuAuSouUmCão', emailTexto, emailHTML);
             }
             catch (emailError) {
@@ -130,7 +128,6 @@ router.get('/documentos/ver/:chave(*)', async (req, res) => {
     try {
         const { chave } = req.params;
         const urlTemporaria = await s3Adapter.gerarLinkTemporario(chave);
-        // MUDANÇA AQUI: Devolvemos a URL no formato JSON em vez de fazer redirect
         res.json({ url: urlTemporaria });
     }
     catch (error) {
@@ -152,10 +149,12 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
         const uploadedFile = req.file;
         let s3Referencia = undefined;
         if (uploadedFile) {
-            s3Referencia = await s3Adapter.uploadFicheiro(uploadedFile.originalname, uploadedFile.buffer, uploadedFile.mimetype, 'documentos' // Fica trancado na pasta documentos
-            );
+            s3Referencia = await s3Adapter.uploadFicheiro(uploadedFile.originalname, uploadedFile.buffer, uploadedFile.mimetype, 'documentos');
         }
         const { boletimVacinasUrl, ...dadosLimposParaA_BD } = req.body;
+        if (dadosLimposParaA_BD.doseDiaria) {
+            dadosLimposParaA_BD.doseDiaria = parseFloat(dadosLimposParaA_BD.doseDiaria);
+        }
         const novoAnimal = await gestor.registarAnimal(dadosLimposParaA_BD, uploadedFile ? {
             dataUltimaVacina: new Date(),
             documento: s3Referencia
@@ -167,45 +166,41 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
-// RESERVAS E RESTANTES ROTAS
+// RESERVAS
 router.get('/reservas', async (req, res) => {
     const reservas = await gestor.listarReservas();
     res.json(reservas);
 });
 router.post('/reservas', async (req, res) => {
     try {
-        const { banhos, tosquias, passeios, idAnimal, ...resto } = req.body;
+        // 👇 SOLUÇÃO DOS SERVIÇOS DO STAFF: Não extraímos os banhos aqui.
+        // Assim eles passam diretamente dentro de "resto" (dadosReserva) para a Facade!
+        const { idAnimal, ...resto } = req.body;
         const dadosReserva = { ...resto, animalId: idAnimal };
-        const servicos = [];
-        if (banhos > 0)
-            for (let i = 0; i < banhos; i++)
-                servicos.push({ tipo: 'Adestramento', preco: 20, data: new Date() });
-        if (tosquias > 0)
-            for (let i = 0; i < tosquias; i++)
-                servicos.push({ tipo: 'Grooming', preco: 10, data: new Date() });
-        if (passeios > 0)
-            for (let i = 0; i < passeios; i++)
-                servicos.push({ tipo: 'Passeio', preco: 10, data: new Date() });
-        const reserva = await gestor.efetuarReserva(dadosReserva, servicos);
+        const reserva = await gestor.efetuarReserva(dadosReserva, []);
         res.status(201).json(reserva);
     }
     catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
+// ROTA DO CHECK-IN
 router.patch('/reservas/:id/checkin', async (req, res) => {
     try {
-        const r = await gestor.checkIn(req.params.id);
-        res.json(r);
+        const { termosAceites } = req.body;
+        const result = await gestor.checkIn(req.params.id, termosAceites);
+        res.json(result);
     }
     catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
+// ROTA DO CHECK-OUT
 router.patch('/reservas/:id/checkout', async (req, res) => {
     try {
-        const r = await gestor.checkOut(req.params.id);
-        res.json(r);
+        const { metodoPagamento } = req.body;
+        const result = await gestor.checkOut(req.params.id, metodoPagamento);
+        res.json(result);
     }
     catch (error) {
         res.status(400).json({ error: error.message });
@@ -234,6 +229,7 @@ router.patch('/plano-vacinal/:idAnimal', async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+// TAREFAS (STAFF)
 router.get('/tarefas', async (req, res) => {
     try {
         const tarefas = await gestor.listarTarefasDoDia();
@@ -243,9 +239,11 @@ router.get('/tarefas', async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
-router.patch('/tarefas/:id/concluir', async (req, res) => {
+router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, res) => {
     try {
-        const tarefa = await gestor.marcarTarefaConcluida(req.params.id);
+        // 👇 SOLUÇÃO ASSINATURAS NOS LOGS (STAFF)
+        const { nomeStaff } = req.body;
+        const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff);
         res.json(tarefa);
     }
     catch (error) {
@@ -311,8 +309,9 @@ router.get('/veterinaria/caes-quarentena', async (req, res) => {
 });
 router.post('/veterinaria/check-diario/:idAnimal', async (req, res) => {
     try {
-        const { notas } = req.body;
-        await gestor.registarCheckDiario(req.params.idAnimal, notas);
+        // 👇 SOLUÇÃO ASSINATURAS NOS LOGS (VET)
+        const { notas, nomeVet } = req.body;
+        await gestor.registarCheckDiario(req.params.idAnimal, notas, nomeVet);
         res.status(201).json({ message: 'Check diário registado com sucesso' });
     }
     catch (error) {
@@ -363,9 +362,70 @@ router.get('/stock', async (req, res) => {
             idItem: s.idItem,
             nome: s.nome,
             quantidade: s.quantidade,
-            tipo: s.medicamento ? 'Medicamento' : 'Racao'
+            tipo: s.medicamento ? 'Medicamento' : 'Racao',
+            idMedicamento: s.medicamento?.idMedicamento || null,
+            idRacao: s.racao?.idRacao || null
         }));
         res.json(stockFormatado);
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+router.get('/veterinaria/tratamentos-ativos', async (req, res) => {
+    try {
+        const tratamentos = await gestor.listarTratamentosAtivos();
+        res.json(tratamentos);
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+router.post('/veterinaria/tratamentos/:idLinha/administrar', async (req, res) => {
+    try {
+        const idFuncionario = req.user?.userId || req.body.funcionarioId;
+        if (!idFuncionario) {
+            return res.status(400).json({ error: "ID do funcionário não fornecido." });
+        }
+        const log = await gestor.registarAdministracaoMedicamento(req.params.idLinha, idFuncionario);
+        res.status(201).json({ message: 'Medicação registada com sucesso!', log });
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+router.patch('/veterinaria/tratamentos/:idLinha/finalizar', async (req, res) => {
+    try {
+        const tratamento = await gestor.finalizarTratamento(req.params.idLinha);
+        res.json({ message: 'Tratamento concluído!', tratamento });
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+// ==========================================
+// ROTAS DA GESTORA
+// ==========================================
+router.get('/faturas', async (req, res) => {
+    try {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        const faturas = await prisma.faturas.findMany({ orderBy: { idFaturas: 'desc' } });
+        res.json(faturas);
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+router.get('/logs', async (req, res) => {
+    try {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        const logs = await prisma.diarioBordo.findMany({
+            include: { animal: true },
+            orderBy: { timestamp: 'desc' }
+        });
+        res.json(logs);
     }
     catch (error) {
         res.status(400).json({ error: error.message });

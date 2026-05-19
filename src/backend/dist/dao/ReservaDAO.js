@@ -74,9 +74,20 @@ class ReservaDAO {
     // ==========================================
     // NOVOS MÉTODOS: VALIDAÇÃO E ATRIBUIÇÃO DE BOXES
     // ==========================================
-    // Conta quantos animais estão agendados numa box específica num período
-    async contarAnimaisEmBox(numeroBox, entrada, saida) {
-        const reservasNaBox = await prisma.reserva.findMany({
+    // Valida se a box está LIMPA e VAZIA (Sem cães nesse período)
+    async verificarCapacidadeBox(numeroBox, entrada, saida) {
+        const box = await prisma.box.findUnique({
+            where: { numero: numeroBox }
+        });
+        if (!box) {
+            return { disponivel: false, motivo: `Box ${numeroBox} não existe.` };
+        }
+        // REGRA DE NEGÓCIO: Só entra se estiver Limpa
+        if (box.estado === 'Suja') {
+            return { disponivel: false, motivo: `Box ${numeroBox} aguarda limpeza.` };
+        }
+        // REGRA DE NEGÓCIO: 1 Cão por Box. Se a query devolver alguma reserva no período, está ocupada.
+        const conflitos = await prisma.reserva.count({
             where: {
                 boxNumero: numeroBox,
                 estado: { in: ['Pendente', 'CheckIn'] },
@@ -86,70 +97,44 @@ class ReservaDAO {
                 ]
             }
         });
-        return reservasNaBox.length; // 1 reserva = 1 animal (modelo simplificado)
+        if (conflitos >= 1) {
+            return { disponivel: false, motivo: `Box ${numeroBox} já está ocupada neste período.` };
+        }
+        return { disponivel: true, tipo: box.tipo };
     }
-    // Valida se há espaço na box e se está em condição de usar
-    async verificarCapacidadeBox(numeroBox, entrada, saida) {
-        const box = await prisma.box.findUnique({
-            where: { numero: numeroBox }
-        });
-        if (!box) {
-            return { disponivel: false, motivo: `Box ${numeroBox} não existe.` };
-        }
-        // Valida se a box está higienizada
-        if (box.estado !== 'Higienizada') {
-            return {
-                disponivel: false,
-                motivo: `Box ${numeroBox} está ${box.estado} - não disponível para check-in.`
-            };
-        }
-        // Conta quantos animais já estão nesta box no período pedido
-        const animaisJaLa = await this.contarAnimaisEmBox(numeroBox, entrada, saida);
-        const espacosLivres = box.tamanho - animaisJaLa;
-        if (espacosLivres <= 0) {
-            return {
-                disponivel: false,
-                motivo: `Box ${numeroBox} está cheia (${animaisJaLa}/${box.tamanho} espaços).`
-            };
-        }
-        return {
-            disponivel: true,
-            espacosLivres,
-            tamanho: box.tamanho,
-            ocupacao: animaisJaLa
-        };
-    }
-    // Atribui automaticamente uma box baseado na reatividade do animal
-    // Regra: 1/4 das boxes para reativos, 3/4 para não-reativos
+    // O NOVO ALGORITMO DE DISTRIBUIÇÃO (Baseado no 'tipo' real da BD e não em % matemáticas)
     async atribuirBoxAutomaticamente(reatividade, entrada, saida) {
-        const todasBoxes = await prisma.box.findMany({ orderBy: { numero: 'asc' } });
-        if (todasBoxes.length === 0) {
+        // Traz todas as boxes ordenadas
+        const boxes = await prisma.box.findMany({ orderBy: { numero: 'asc' } });
+        if (boxes.length === 0) {
             throw new Error("Nenhuma box disponível no sistema.");
         }
-        // Calcula o limite: 1/4 para reativos
-        const limitReativos = Math.ceil(todasBoxes.length / 4);
-        const boxesReativos = todasBoxes.slice(0, limitReativos);
-        const boxesNaoReativos = todasBoxes.slice(limitReativos);
-        // Define qual categoria de boxes procurar
-        const categoriaPreferida = reatividade === 'Reativo' ? boxesReativos : boxesNaoReativos;
-        const categoriaAlternativa = reatividade === 'Reativo' ? boxesNaoReativos : boxesReativos;
-        // Tenta atribuir numa box da categoria preferida
-        for (const box of categoriaPreferida) {
+        // Filtramos os nossos lotes (As 40 boxes que vais criar na BD)
+        const naoReativas = boxes.filter(b => b.tipo === 'Não-Reativo');
+        const reativas = boxes.filter(b => b.tipo === 'Reativo');
+        // Define a prioridade com base na agressividade do cão
+        const preferidas = reatividade === 'Reativo' ? reativas : naoReativas;
+        const alternativas = reatividade === 'Reativo' ? naoReativas : reativas;
+        // 1ª Tentativa: Tenta colocar na área correta
+        for (const box of preferidas) {
             const validacao = await this.verificarCapacidadeBox(box.numero, entrada, saida);
             if (validacao.disponivel) {
                 return box.numero; // Box atribuída!
             }
         }
-        // Se não houver espaço na categoria preferida, procura na alternativa
-        for (const box of categoriaAlternativa) {
+        // 2ª Tentativa (O Fallback): Se não há, vai para o "último possível" da área oposta
+        for (const box of alternativas) {
             const validacao = await this.verificarCapacidadeBox(box.numero, entrada, saida);
             if (validacao.disponivel) {
-                return box.numero; // Box atribuída (categoria diferente)
+                return box.numero; // Box atribuída!
             }
         }
-        // Se chegou aqui, hotel está cheio
-        throw new Error("OVERBOOKING: Nenhuma box disponível para este período.");
+        // Se chegou aqui, hotel está cheio nas datas pedidas
+        throw new Error("OVERBOOKING: O Hotel está com lotação esgotada para o período selecionado.");
     }
+    // ==========================================
+    // TAREFAS DO STAFF
+    // ==========================================
     async findTarefasDoDia() {
         const hoje = new Date();
         const inicioDia = new Date(hoje.setHours(0, 0, 0, 0));
@@ -160,16 +145,16 @@ class ReservaDAO {
                     gte: inicioDia,
                     lte: fimDia,
                 },
-                estado: 'Pendente', // Apenas tarefas que o Staff ainda não fez
-                // 👇 A CORREÇÃO ENTRA AQUI 👇
+                estado: 'Pendente',
                 reserva: {
-                    estado: 'CheckIn' // Garante que o animal já está fisicamente no hotel!
+                    estado: 'CheckIn' // Garante que o animal já está fisicamente no hotel
                 }
             },
             include: {
                 reserva: {
                     include: {
-                        animal: true
+                        animal: true,
+                        box: true // 👇 A ÚNICA PALAVRA QUE FALTAVA PARA O MAPA FUNCIONAR! 👇
                     }
                 }
             }
@@ -236,16 +221,75 @@ class ReservaDAO {
         amanha.setDate(amanha.getDate() + 1);
         return await prisma.servico.findMany({
             where: {
-                reserva: {
-                    animalId: idAnimal
-                },
+                reserva: { animalId: idAnimal },
                 estado: 'Finalizado',
-                data: {
-                    gte: hoje,
-                    lt: amanha
-                }
+                data: { gte: hoje, lt: amanha }
             },
             orderBy: { data: 'asc' }
+        });
+    }
+    // ==========================================
+    // FATURAÇÃO E CHECK-OUT
+    // ==========================================
+    // Busca uma reserva específica com os dados do Animal para podermos faturar
+    async findByIdComAnimal(idReserva) {
+        return await prisma.reserva.findUnique({
+            where: { idReserva },
+            include: { animal: true }
+        });
+    }
+    // 🐛 FIX BUGS 7: TIRAR DA QUARENTENA NO CHECK-OUT E SUJAR BOX
+    async processarCheckOutDB(idReserva, valorFinal, idFatura) {
+        const reserva = await prisma.reserva.findUnique({
+            where: { idReserva },
+            include: { animal: true } // Precisamos do animal para ver a saúde dele
+        });
+        if (reserva) {
+            // 1. Suja a Box à espera do Staff
+            await prisma.box.update({
+                where: { numero: reserva.boxNumero },
+                data: { estado: 'Suja' }
+            });
+            // 2. [BUG 7 RESOLVIDO]: Dá "Alta" automática se ele estava em Quarentena!
+            if (reserva.animal.estado === 'Quarentena') {
+                await prisma.animal.update({
+                    where: { idAnimal: reserva.animalId },
+                    data: { estado: 'Saudavel' }
+                });
+                // (Opcional) Regista no diário de bordo que a quarentena acabou porque o dono o levou
+                await prisma.diarioBordo.create({
+                    data: {
+                        descricao: `✅ [ALTA AUTOMÁTICA] O animal saiu do hotel (Check-Out), logo a quarentena médica foi encerrada no sistema.`,
+                        animalId: reserva.animalId
+                    }
+                });
+            }
+        }
+        return await prisma.reserva.update({
+            where: { idReserva },
+            data: {
+                estado: 'CheckOut',
+                valor: valorFinal,
+                faturaId: idFatura
+            }
+        });
+    }
+    // 🐛 FIX BUG 6: FORÇAR A VET A VER O CÃO NOVO
+    async processarCheckInDB(idReserva) {
+        const reserva = await prisma.reserva.findUnique({ where: { idReserva } });
+        if (reserva) {
+            // [BUG 6 RESOLVIDO]: Assim que entra no hotel, a flag de verificação volta a falso!
+            await prisma.animal.update({
+                where: { idAnimal: reserva.animalId },
+                data: { check: false }
+            });
+        }
+        return await prisma.reserva.update({
+            where: { idReserva },
+            data: {
+                estado: 'CheckIn',
+                termoAceite: true
+            }
         });
     }
 }

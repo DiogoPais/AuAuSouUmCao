@@ -9,5 +9,11 @@ class FaturaDAO {
             data: dadosFatura
         });
     }
+    // Busca todas as faturas para o Dashboard da Gestora
+    async findAll() {
+        return await prisma.faturas.findMany({
+            orderBy: { idFaturas: 'desc' } // Mostra as mais recentes primeiro
+        });
+    }
 }
 exports.FaturaDAO = FaturaDAO;

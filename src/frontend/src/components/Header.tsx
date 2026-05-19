@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({ title, userData }) => {
     <header className="site-header" style={{ height: '130px', padding: '0 0px' }}>
       <Link to="/" className="logo-container">
         <img 
-          src="https://cdn.discordapp.com/attachments/1212044201747816518/1496523823208599603/Gemini_Generated_Image_sebx2ssebx2ssebx.png?ex=69ea31eb&is=69e8e06b&hm=e86093c99b49fbbe0b718a5942cb18caa1e6e79fdf19253b2e252c75d225bb2e" 
+          src="../../foto.png" 
           alt="Logo"
           style={{ width: '250px', height: '130px' }}
         />

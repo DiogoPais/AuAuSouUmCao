@@ -4,9 +4,12 @@ exports.LogsDAO = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 class LogsDAO {
-    async createLog(funcionarioId) {
+    async createLog(linhaId, funcionarioId) {
         return await prisma.logMedicacao.create({
-            data: { funcionarioId }
+            data: {
+                linhaId,
+                funcionarioId
+            }
         });
     }
 }
