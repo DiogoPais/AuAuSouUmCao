@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut, LogIn } from 'lucide-react'; // Importamos o LogIn também
 import { Link, useNavigate } from 'react-router-dom';
 import './Shared.css';
-import logoImg from '../../foto.png';
+import logoImg from '../../foto.webp';
 
 interface HeaderProps {
   title?: string;
