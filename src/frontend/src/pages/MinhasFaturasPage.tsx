@@ -45,48 +45,133 @@ const MinhasFaturasPage: React.FC = () => {
   const handleImprimirFatura = (fatura: Fatura) => {
     const novaAba = window.open('', '_blank');
     if (novaAba) {
+      // 1. Cálculos do IVA (Assumindo taxa normal de 23% para serviços em Portugal)
+      const taxaIva = 0.23;
+      const valorBase = fatura.valorTotal / (1 + taxaIva);
+      const valorIva = fatura.valorTotal - valorBase;
+
+      // 2. Simulação de Numeração Sequencial e ATCUD
+      const anoAtual = new Date().getFullYear();
+      const numFaturaSimulado = fatura.documento.split('-')[0].substring(0, 5).toUpperCase(); // Ex: A3F9B
+      const faturaIdFormatado = `FT ${anoAtual}/${numFaturaSimulado}`;
+      const atcudSimulado = `AT-${fatura.documento.substring(0, 8).toUpperCase()}`;
+
+      // 3. Formatação de datas
       const timestampPart = fatura.documento.split('-')[1];
-      const dataEmissao = timestampPart ? new Date(parseInt(timestampPart)).toLocaleString('pt-PT') : new Date().toLocaleString('pt-PT');
+      const dataEmissao = timestampPart 
+        ? new Date(parseInt(timestampPart)).toLocaleDateString('pt-PT') 
+        : new Date().toLocaleDateString('pt-PT');
 
       novaAba.document.write(`
         <html>
           <head>
-            <title>Recibo - ${fatura.documento}</title>
+            <title>Fatura ${faturaIdFormatado}</title>
             <style>
-              body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
-              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7DDFD3; padding-bottom: 20px; }
-              .logo { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #7DDFD3; }
-              .details { margin-top: 30px; line-height: 1.6; }
-              .total-box { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #28a745; }
-              .print-btn { margin-top: 40px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-              @media print { .print-btn { display: none; } }
+              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; font-size: 14px; }
+              .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+              .logo { width: 100px; height: 100px; object-fit: contain; }
+              .company-details { font-size: 13px; line-height: 1.5; color: #555; }
+              
+              .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; }
+              .client-box { border: 1px solid #ccc; padding: 15px; border-radius: 5px; width: 45%; }
+              .invoice-meta { width: 45%; text-align: right; }
+              
+              table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+              th { background-color: #f4f4f4; border-bottom: 2px solid #ddd; padding: 10px; text-align: left; }
+              td { padding: 10px; border-bottom: 1px solid #eee; }
+              .text-right { text-align: right; }
+              
+              .totals-section { display: flex; justify-content: flex-end; margin-bottom: 40px; }
+              .totals-box { width: 300px; border: 1px solid #333; padding: 15px; border-radius: 5px; background-color: #f9f9f9; }
+              .totals-line { display: flex; justify-content: space-between; margin-bottom: 8px; }
+              .totals-line.bold { font-weight: bold; font-size: 16px; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 8px; }
+              
+              .footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 20px; font-size: 12px; color: #666; }
+              .qr-mock { width: 80px; height: 80px; background-color: #eee; border: 1px dashed #999; display: flex; align-items: center; justify-content: center; font-size: 10px; text-align: center; }
+              
+              .print-btn { margin-top: 20px; padding: 10px 20px; background: #000; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+              @media print { .print-btn { display: none; } body { padding: 0; } }
             </style>
           </head>
           <body>
+            
             <div class="header">
               <div>
-                <h1 style="margin:0;">Hotel Canino - AuAuSouUmCão</h1>
-                <p style="margin: 5px 0 0 0; color: #666;">Comprovativo de Pagamento do Cliente</p>
+                <h1 style="margin: 0 0 10px 0; font-size: 24px;">Fatura / Recibo</h1>
+                <div class="company-details">
+                  <strong>AuAuSouUmCão - Hotel Canino, Lda.</strong><br/>
+                  Rua dos Patudos, 123<br/>
+                  4700-000 Braga, Portugal<br/>
+                  NIF: 500 123 456
+                </div>
               </div>
-              
               <img src="${window.location.origin}${logoImg}" class="logo" alt="Logo" />
-              
             </div>
             
-            <div class="details">
-              <p><strong>Nº Fatura:</strong> ${fatura.documento}</p>
-              <p><strong>Data de Emissão:</strong> ${dataEmissao}</p>
-              <br/>
-              <p><strong>Nome do Cliente:</strong> ${tutor.nome}</p>
-              <p><strong>NIF do Cliente:</strong> ${fatura.nifCliente}</p>
+            <div class="info-section">
+              <div class="client-box">
+                <p style="margin: 0 0 5px 0; color: #777; font-size: 12px;"><strong>Exmo.(a) Senhor(a)</strong></p>
+                <p style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">${tutor.nome}</p>
+                <p style="margin: 0;">NIF: ${fatura.nifCliente || 'Consumidor Final'}</p>
+              </div>
+              
+              <div class="invoice-meta">
+                <h2 style="margin: 0 0 5px 0; color: #333;">${faturaIdFormatado}</h2>
+                <p style="margin: 0 0 5px 0;"><strong>Data de Emissão:</strong> ${dataEmissao}</p>
+                <p style="margin: 0;"><strong>Data da Operação:</strong> ${dataEmissao}</p>
+              </div>
             </div>
 
-            <div class="total-box">
-              <h2 style="margin: 0 0 10px 0;">Total Liquidado: ${fatura.valorTotal.toFixed(2)} €</h2>
-              <p style="margin: 0; color: #555;"><strong>Método de Liquidação:</strong> ${fatura.metodoPagamento}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th class="text-right">Qtd.</th>
+                  <th class="text-right">Taxa IVA</th>
+                  <th class="text-right">Valor Base</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Serviços de Alojamento e Cuidados Caninos</td>
+                  <td class="text-right">1</td>
+                  <td class="text-right">23%</td>
+                  <td class="text-right">${valorBase.toFixed(2)} €</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="totals-section">
+              <div class="totals-box">
+                <div class="totals-line">
+                  <span>Total Ilíquido:</span>
+                  <span>${valorBase.toFixed(2)} €</span>
+                </div>
+                <div class="totals-line">
+                  <span>Total IVA (23%):</span>
+                  <span>${valorIva.toFixed(2)} €</span>
+                </div>
+                <div class="totals-line bold">
+                  <span>Total a Pagar:</span>
+                  <span>${fatura.valorTotal.toFixed(2)} €</span>
+                </div>
+                <p style="margin: 10px 0 0 0; font-size: 12px; text-align: right; color: #666;">
+                  Método: ${fatura.metodoPagamento}
+                </p>
+              </div>
             </div>
 
-            <button class="print-btn" onclick="window.print()">🖨️ Imprimir Segunda Via</button>
+            <div class="footer">
+              <div>
+                <p style="margin: 0 0 5px 0;"><strong>ATCUD:</strong> ${atcudSimulado}</p>
+                <p style="margin: 0;">Fatura processada por programa certificado n.º 9999/AT.</p>
+              </div>
+              <div class="qr-mock">
+                [QR CODE<br/>SIMULADO]
+              </div>
+            </div>
+
+            <button class="print-btn" onclick="window.print()">🖨️ Imprimir Fatura</button>
           </body>
         </html>
       `);
