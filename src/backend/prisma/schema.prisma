@@ -83,8 +83,8 @@ model Funcionario {
   utilizador   Utilizador @relation(fields: [utilizadorId], references: [idUtilizador], onDelete: Cascade)
 
   // Relações clínicas
-  prescricoes Prescricao[]
-  logsMedicos LogMedicacao[]
+  prescricoes       Prescricao[]
+  logsMedicos       LogMedicacao[]
   tarefasAtribuidas Servico[]
 }
 
@@ -101,8 +101,8 @@ model Animal {
   check       Boolean       @default(false)
   tipoTrela   String?       @default("Normal")
 
-  racaoId     String?       // Guarda o ID do Item de Stock da Ração que o cão come
-  doseDiaria  Float?        // Quantidade a descontar de cada vez que a tarefa for concluída
+  racaoId    String? // Guarda o ID do Item de Stock da Ração que o cão come
+  doseDiaria Float? // Quantidade a descontar de cada vez que a tarefa for concluída
 
   // Os animais é que têm tutor (Chave Estrangeira aqui)
   tutorNif String
@@ -110,7 +110,6 @@ model Animal {
 
   planoVacinal PlanoVacinal?
   reservas     Reserva[] // Exigência Prisma (A FK está na Reserva)
-  diarioBordo  DiarioBordo[] // Exigência Prisma (A FK está no DiarioBordo)
   prescricoes  Prescricao[] // Exigência Prisma (A FK está na Prescricao)
 }
 
@@ -126,14 +125,14 @@ model PlanoVacinal {
 }
 
 model Box {
-  numero    Int       @id
-  
-  // NOVOS CAMPOS EXCLUSIVOS (Substituem o Tamanho):
-  tipo      String    @default("Não-Reativo") 
-  
-  estado    String    @default("Limpa")
+  numero Int @id
 
-  reservas  Reserva[]
+  // NOVOS CAMPOS EXCLUSIVOS (Substituem o Tamanho):
+  tipo String @default("Não-Reativo")
+
+  estado String @default("Limpa")
+
+  reservas Reserva[]
 }
 
 model Reserva {
@@ -156,6 +155,8 @@ model Reserva {
   fatura   Faturas? @relation(fields: [faturaId], references: [idFaturas])
 
   servicos Servico[] // Exigência Prisma (A FK está no Servico para permitir múltiplos)
+
+  diarioBordo DiarioBordo[]
 }
 
 model Servico {
@@ -164,7 +165,7 @@ model Servico {
   preco     Float
   tipo      TipoServico
   estado    EstadoServico @default(Pendente)
-  descricao String?       // NOVO: Descrição do serviço
+  descricao String? // NOVO: Descrição do serviço
 
   reservaId String
   reserva   Reserva @relation(fields: [reservaId], references: [idReserva])
@@ -191,9 +192,8 @@ model DiarioBordo {
   timestamp DateTime @default(now())
   fotos     String[]
 
-  // O diário é que tem animal (Chave estrangeira aqui)
-  animalId String
-  animal   Animal @relation(fields: [animalId], references: [idAnimal])
+  reservaId String
+  reserva   Reserva @relation(fields: [reservaId], references: [idReserva])
 }
 
 // 4. CLÍNICA / MEDICAMENTOS / STOCK
@@ -203,8 +203,8 @@ model Stock {
   quantidade   Int
   limiteAlerta Int
 
-  medicamento  Medicamento? // Herança 1:1
-  racao        Racao?       // Herança 1:1
+  medicamento Medicamento? // Herança 1:1
+  racao       Racao? // Herança 1:1
 }
 
 model Medicamento {
@@ -214,11 +214,11 @@ model Medicamento {
   stockId String @unique
   stock   Stock  @relation(fields: [stockId], references: [idItem], onDelete: Cascade)
 
-  linhas  LinhaPrescricao[]
+  linhas LinhaPrescricao[]
 }
 
 model Racao {
-  idRacao String @id @default(uuid())
+  idRacao String  @id @default(uuid())
   marca   String? // Opcional, ex: Royal Canin
 
   stockId String @unique
@@ -226,42 +226,42 @@ model Racao {
 }
 
 model Prescricao {
-  idPrescricao  String      @id @default(uuid())
-  data          DateTime
-  
+  idPrescricao String   @id @default(uuid())
+  data         DateTime
+
   animalId      String
   animal        Animal      @relation(fields: [animalId], references: [idAnimal])
   funcionarioId String
   funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
 
   // Uma prescrição tem várias linhas (medicamentos diferentes)
-  linhas        LinhaPrescricao[]
+  linhas LinhaPrescricao[]
 }
 
 model LinhaPrescricao {
-  idLinha       String      @id @default(uuid())
-  dosagem       Float
-  frequencia    String
-  
-  totalDoses    Int         @default(1) 
-  ativa         Boolean     @default(true) 
-  
-  prescricaoId  String
-  prescricao    Prescricao  @relation(fields: [prescricaoId], references: [idPrescricao], onDelete: Cascade)
-  
+  idLinha    String @id @default(uuid())
+  dosagem    Float
+  frequencia String
+
+  totalDoses Int     @default(1)
+  ativa      Boolean @default(true)
+
+  prescricaoId String
+  prescricao   Prescricao @relation(fields: [prescricaoId], references: [idPrescricao], onDelete: Cascade)
+
   medicamentoId String
   medicamento   Medicamento @relation(fields: [medicamentoId], references: [idMedicamento])
 
-  logsAdministracao LogMedicacao[] 
+  logsAdministracao LogMedicacao[]
 }
 
 model LogMedicacao {
-  idLog         String      @id @default(uuid())
-  timestamp     DateTime    @default(now())
-  
+  idLog     String   @id @default(uuid())
+  timestamp DateTime @default(now())
+
   funcionarioId String
   funcionario   Funcionario @relation(fields: [funcionarioId], references: [idFuncionario])
 
-  linhaId       String
-  linha         LinhaPrescricao @relation(fields: [linhaId], references: [idLinha], onDelete: Cascade)
+  linhaId String
+  linha   LinhaPrescricao @relation(fields: [linhaId], references: [idLinha], onDelete: Cascade)
 }

@@ -202,18 +202,6 @@ const StaffPage: React.FC = () => {
         <div className="staff-info-bar">
           <p><strong>Staff:</strong> {staffCount} membros</p>
           <p><strong>Tarefas do dia:</strong> {tarefasSeguras.length}</p>
-          <button 
-            onClick={() => {
-              alert("⚠️ ALERTA ENVIADO! A Gestora foi notificada de que uma ração terminou.");
-            }}
-            style={{ 
-              backgroundColor: '#dc3545', color: 'white', border: 'none', 
-              padding: '8px 12px', borderRadius: '4px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold'
-            }}
-          >
-            ⚠️ Reportar Falta de Ração
-          </button>
         </div>
 
         <div className="staff-content">

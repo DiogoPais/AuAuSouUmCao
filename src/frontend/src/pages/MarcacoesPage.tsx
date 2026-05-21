@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Plus, Trash2, Check } from 'lucide-react';
+import { Calendar, Plus, Trash2, Check, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './MarcacoesPage.css';
@@ -480,6 +480,29 @@ const MarcacoesPage: React.FC = () => {
               </div>
             )}
           </section>
+        </div>
+        {/* BOTÃO DE VOLTAR ADICIONADO AQUI */}
+        <div style={{ marginTop: '40px', padding: '20px 0', borderTop: '1px solid #eee' }}>
+          <button 
+            onClick={() => window.history.back()}
+            style={{ 
+              padding: '10px 20px', 
+              background: '#6c757d', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontWeight: 'bold',
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#5a6268'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#6c757d'}
+          >
+            <ArrowLeft size={18} /> Voltar à Página Anterior
+          </button>
         </div>
       </main>
 

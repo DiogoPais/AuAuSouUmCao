@@ -8,7 +8,7 @@ const s3Client = new S3Client({
 export class S3StorageAdapter {
   private bucketName = process.env.S3_BUCKET_NAME || "hotel-animais-bucket";
 
-  async uploadFicheiro(nomeFicheiro: string, ficheiroBuffer: Buffer, tipoMime: string, pasta: 'animais' | 'documentos'): Promise<string> {
+  async uploadFicheiro(nomeFicheiro: string, ficheiroBuffer: Buffer, tipoMime: string, pasta: 'animais' | 'documentos' | 'diario'): Promise<string> {
     const nomeLimpo = nomeFicheiro.replace(/\s+/g, '-');
     const chaveS3 = `${pasta}/${Date.now()}-${nomeLimpo}`;
 
@@ -23,7 +23,7 @@ export class S3StorageAdapter {
     
     // Se for foto de animal, devolve o link completo (público)
     // Se for documento, devolve só a Key interna (privado)
-    return pasta === 'animais' 
+    return (pasta === 'animais' || pasta === 'diario') 
       ? `https://${this.bucketName}.s3.${process.env.AWS_REGION || "eu-west-3"}.amazonaws.com/${chaveS3}`
       : chaveS3;
   }

@@ -21,7 +21,7 @@ export class PrescricaoDAO {
           create: dados.linhas.map((linha: any) => ({
             dosagem: linha.dosagem,
             frequencia: linha.frequencia,
-            totalDoses: linha.totalDoses, // <--- ADICIONADO
+            totalDoses: linha.totalDoses,
             medicamentoId: linha.medicamentoId
           }))
         }
@@ -30,12 +30,11 @@ export class PrescricaoDAO {
     });
   }
 
-  // 2. PUXAR TRATAMENTOS ATIVOS (Agora com filtro de presença no hotel!)
+  // 2. PUXAR TRATAMENTOS ATIVOS 
   async listarTratamentosAtivos() {
     return await prisma.linhaPrescricao.findMany({
       where: { 
         ativa: true,
-        // 👇 A MAGIA ESTÁ AQUI: Só mostra se o cão estiver fisicamente no hotel! 👇
         prescricao: {
           animal: {
             reservas: {
@@ -68,7 +67,6 @@ export class PrescricaoDAO {
 
     if (!funcionario) throw new Error("Não foi possível encontrar o perfil de Funcionário.");
 
-    // Regista a toma
     const log = await prisma.logMedicacao.create({
       data: {
         linhaId: idLinha,
@@ -76,13 +74,11 @@ export class PrescricaoDAO {
       }
     });
 
-    // Puxa o histórico atualizado
     const linha = await prisma.linhaPrescricao.findUnique({
       where: { idLinha },
       include: { logsAdministracao: true }
     });
 
-    // MAGIA: Se os logs chegarem ou passarem o total de doses, desativa a linha!
     if (linha && linha.logsAdministracao.length >= linha.totalDoses) {
       await prisma.linhaPrescricao.update({
         where: { idLinha },
@@ -113,13 +109,13 @@ export class PrescricaoDAO {
     });
   }
 
-  // A MÁGICA DO BOOLEANO: Lista cães hospedados que ainda não têm o "check" feito hoje
+  // Lista cães hospedados que ainda não têm o "check" feito hoje
   async listarCaesParaVerificar() {
     return await prisma.animal.findMany({
       where: {
-        check: false, // Usa o teu novo atributo de forma super otimizada!
+        check: false, 
         reservas: {
-          some: { estado: 'CheckIn' } // Só puxa os cães que já deram entrada no hotel
+          some: { estado: 'CheckIn' } 
         }
       },
       include: {
@@ -132,110 +128,149 @@ export class PrescricaoDAO {
     });
   }
 
-  // Regista um check diário da veterinária
+  // 👇 ATUALIZADO: Regista o check diário (associado à Reserva!)
   async registarCheckDiario(idAnimal: string, notas: string, nomeVet: string) {
     await prisma.animal.update({ where: { idAnimal }, data: { check: true } });
 
-    // 👇 A MÁGICA ENTRA AQUI 👇
-    return await prisma.diarioBordo.create({
-      data: {
-        descricao: `[CHECK CLÍNICO por ${nomeVet}] ${notas}`,
-        animalId: idAnimal
-      }
+    const reservaAtiva = await prisma.reserva.findFirst({
+      where: { animalId: idAnimal, estado: 'CheckIn' }
     });
+
+    if (reservaAtiva) {
+      return await prisma.diarioBordo.create({
+        data: {
+          descricao: `[CHECK CLÍNICO por ${nomeVet}] ${notas}`,
+          reservaId: reservaAtiva.idReserva // 👈 MUDADO DE animalId PARA reservaId
+        }
+      });
+    }
+    return null;
   }
 
+  // 👇 ATUALIZADO: Ativar quarentena e criar log (associado à Reserva!)
   async ativarQuarentena(idAnimal: string, motivo: string) {
-    // 1. Muda o estado clínico
     const animalAtualizado = await prisma.animal.update({
       where: { idAnimal },
       data: { estado: 'Quarentena' }
     });
 
-    // 2. PROTOCOLO DE ISOLAMENTO: Realocar a reserva ativa para uma Box de Quarentena
     const reservaAtiva = await prisma.reserva.findFirst({
       where: { animalId: idAnimal, estado: 'CheckIn' },
       include: { box: true }
     });
 
-    if (reservaAtiva && reservaAtiva.box.tipo !== 'Quarentena') {
-      // Procura uma box de Quarentena Limpa e Vazia
-      const boxQuarentena = await prisma.box.findFirst({
-        where: { tipo: 'Quarentena', estado: 'Limpa' },
-        orderBy: { numero: 'asc' }
+    if (reservaAtiva) {
+      if (reservaAtiva.box.tipo !== 'Quarentena') {
+        const boxQuarentena = await prisma.box.findFirst({
+          where: { tipo: 'Quarentena', estado: 'Limpa' },
+          orderBy: { numero: 'asc' }
+        });
+
+        if (boxQuarentena) {
+          await prisma.box.update({
+            where: { numero: reservaAtiva.boxNumero },
+            data: { estado: 'Suja' }
+          });
+
+          await prisma.reserva.update({
+            where: { idReserva: reservaAtiva.idReserva },
+            data: { boxNumero: boxQuarentena.numero }
+          });
+
+          await prisma.box.update({
+            where: { numero: boxQuarentena.numero },
+            data: { estado: 'Ocupada' }
+          });
+        }
+      }
+
+      // 👈 MUDADO DE animalId PARA reservaId
+      await prisma.diarioBordo.create({
+        data: {
+          descricao: `🚨 [QUARENTENA] ${motivo}. Protocolo de Isolamento ativado.`,
+          reservaId: reservaAtiva.idReserva 
+        }
       });
-
-      if (boxQuarentena) {
-        // Suja a Box antiga onde o cão infetado esteve
-        await prisma.box.update({
-          where: { numero: reservaAtiva.boxNumero },
-          data: { estado: 'Suja' }
-        });
-
-        // Transfere o cão e marca a nova box como "Ocupada" pela Quarentena
-        await prisma.reserva.update({
-          where: { idReserva: reservaAtiva.idReserva },
-          data: { boxNumero: boxQuarentena.numero }
-        });
-
-        await prisma.box.update({
-          where: { numero: boxQuarentena.numero },
-          data: { estado: 'Ocupada' }
-        });
-      }
     }
-
-    // 3. Regista o alerta
-    await prisma.diarioBordo.create({
-      data: {
-        descricao: `🚨 [QUARENTENA] ${motivo}. Protocolo de Isolamento ativado.`,
-        animalId: idAnimal
-      }
-    });
 
     return animalAtualizado;
   }
 
-  // Desativa quarentena
+  // 👇 ATUALIZADO: Desativar quarentena e criar log (associado à Reserva!)
   async desativarQuarentena(idAnimal: string) {
     const animalAtualizado = await prisma.animal.update({
       where: { idAnimal },
       data: { estado: 'Saudavel' }
     });
 
-    // Regista a alta no diário
-    await prisma.diarioBordo.create({
-      data: {
-        descricao: `✅ [ALTA MÉDICA] O animal foi retirado da quarentena.`,
-        animalId: idAnimal
-      }
+    const reservaAtiva = await prisma.reserva.findFirst({
+      where: { animalId: idAnimal, estado: 'CheckIn' },
+      include: { box: true }
     });
+
+    if (reservaAtiva) {
+      if (reservaAtiva.box.tipo === 'Quarentena') {
+        const boxNormal = await prisma.box.findFirst({
+          where: { 
+            tipo: { not: 'Quarentena' }, 
+            estado: 'Limpa' 
+          },
+          orderBy: { numero: 'asc' }
+        });
+
+        if (boxNormal) {
+          await prisma.box.update({
+            where: { numero: reservaAtiva.boxNumero },
+            data: { estado: 'Suja' }
+          });
+
+          await prisma.reserva.update({
+            where: { idReserva: reservaAtiva.idReserva },
+            data: { boxNumero: boxNormal.numero }
+          });
+
+          await prisma.box.update({
+            where: { numero: boxNormal.numero },
+            data: { estado: 'Ocupada' }
+          });
+        }
+      }
+
+      // 👈 MUDADO DE animalId PARA reservaId
+      await prisma.diarioBordo.create({
+        data: {
+          descricao: `✅ [ALTA MÉDICA] O animal teve alta e foi transferido da quarentena de volta para a ala normal.`,
+          reservaId: reservaAtiva.idReserva
+        }
+      });
+    }
 
     return animalAtualizado;
   }
 
-  // Lista cães em quarentena (MAS SÓ OS QUE ESTÃO NO HOTEL!)
+  // Lista cães em quarentena
   async listarEmQuarentena() {
     return await prisma.animal.findMany({
       where: { 
         estado: 'Quarentena',
-        // 👇 A MÁGICA ENTRA AQUI: Só mostra se o cão estiver fisicamente no hotel
         reservas: {
           some: { estado: 'CheckIn' }
         }
       },
       include: {
         tutor: { include: { utilizador: true } },
-        diarioBordo: { orderBy: { timestamp: 'desc' }, take: 5 },
+        // 👇 ATUALIZADO: Buscar diário através das reservas em vez de diretamente no animal
         reservas: {
           where: { estado: 'CheckIn' },
-          include: { box: true }
+          include: { 
+            box: true,
+            diarioBordo: { orderBy: { timestamp: 'desc' }, take: 5 }
+          }
         }
       }
     });
   }
 
-  // Verifica se um animal já foi verificado hoje
   async verificarSeJaFoiCheckHoje(idAnimal: string) {
     const animal = await prisma.animal.findUnique({
       where: { idAnimal },

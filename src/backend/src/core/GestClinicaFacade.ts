@@ -31,8 +31,6 @@ export class GestClinicaFacade {
 
     const deducoesPendentes = [];
 
-    // 1. Validar e converter Nomes em IDs
-    // Substitui o "for (const linha of dadosPrescricao.linhas)" por isto:
     for (const linha of dadosPrescricao.linhas) {
       if (linha.dosagem <= 0 || linha.totalDoses <= 0) {
         throw new Error("A dosagem e o total de doses devem ser superiores a zero.");
@@ -44,7 +42,6 @@ export class GestClinicaFacade {
         throw new Error(`Medicamento '${linha.medicamentoId}' não encontrado no stock.`);
       }
 
-      // CALCULA O STOCK A DESCONTAR: (ex: toma 2 pilulas * 5 vezes = desconta 10 do stock)
       const quantidadeTotalGasta = linha.dosagem * linha.totalDoses;
 
       if (stockItem.quantidade < quantidadeTotalGasta) {
@@ -59,10 +56,8 @@ export class GestClinicaFacade {
       });
     }
 
-    // 2. Criar a Prescrição
     const novaPrescricao = await this.prescricaoDAO.create(dadosPrescricao);
 
-    // 3. Descontar o Stock
     for (const deducao of deducoesPendentes) {
       await this.stockDAO.updateQuantidade(deducao.stockId, deducao.novaQuantidade);
     }
@@ -74,9 +69,19 @@ export class GestClinicaFacade {
     return await this.stockDAO.findAll();
   }
 
+  async reforcarStock(idItem: string, quantidadeAdicionada: number) {
+    if (quantidadeAdicionada <= 0) throw new Error("A quantidade a adicionar deve ser maior que zero.");
+    const item = await this.stockDAO.findById(idItem);
+    if (!item) throw new Error("Item de stock não encontrado.");
+    const novaQuantidade = item.quantidade + quantidadeAdicionada;
+    return await this.stockDAO.updateQuantidade(idItem, novaQuantidade);
+  }
+
   // ==========================================
   // GESTÃO DE CHECKS DIÁRIOS E QUARENTENA
   // ==========================================
+
+  // 👇 CORREÇÃO: Recebe o nomeVet e passa para o DAO
   async registarCheckDiario(idAnimal: string, notas: string, nomeVet: string = 'Veterinário(a)') {
     if (!notas || notas.trim().length === 0) {
       throw new Error("O check deve incluir notas do veterinário.");

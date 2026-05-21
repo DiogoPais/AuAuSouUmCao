@@ -195,6 +195,15 @@ router.post('/animais', upload.single('vacinasFile'), async (req, res) => {
   }
 });
 
+router.get('/animais/:id/servicos-finalizados', async (req, res) => {
+  try {
+    const servicos = await gestor.obterServicosFinalizadosHoje(req.params.id);
+    res.json(servicos);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // RESERVAS
 router.get('/reservas', async (req, res) => {
   const reservas = await gestor.listarReservas();
@@ -270,9 +279,22 @@ router.get('/tarefas', async (req, res) => {
 
 router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, res) => {
   try {
-    // 👇 SOLUÇÃO ASSINATURAS NOS LOGS (STAFF)
     const { nomeStaff } = req.body; 
-    const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff);
+    const uploadedFile = (req as any).file; 
+    let fotoUrl = undefined;
+
+    // Se o Staff tirou uma foto, fazemos upload para o S3!
+    if (uploadedFile) {
+      fotoUrl = await s3Adapter.uploadFicheiro(
+        uploadedFile.originalname,
+        uploadedFile.buffer,
+        uploadedFile.mimetype,
+        'diario' // Guarda na pasta 'diario' da nuvem
+      );
+    }
+
+    // Passamos a fotoUrl para a Facade
+    const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff, fotoUrl);
     res.json(tarefa);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -402,6 +424,16 @@ router.get('/stock', async (req, res) => {
   }
 });
 
+router.patch('/stock/:idItem/reforcar', async (req, res) => {
+  try {
+    const { quantidade } = req.body;
+    const itemAtualizado = await gestor.reforcarStock(req.params.idItem, Number(quantidade));
+    res.json(itemAtualizado);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 router.get('/veterinaria/tratamentos-ativos', async (req, res) => {
   try {
     const tratamentos = await gestor.listarTratamentosAtivos();
@@ -458,6 +490,16 @@ router.get('/logs', async (req, res) => {
       orderBy: { timestamp: 'desc' }
     });
     res.json(logs);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/faturas/tutor/:nif', async (req, res) => {
+  try {
+    // Busca as faturas que pertencem ao NIF do tutor
+    const faturas = await gestor.listarFaturasDoTutor(req.params.nif);
+    res.json(faturas);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

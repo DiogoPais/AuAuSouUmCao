@@ -10,6 +10,7 @@ import StaffPage from './pages/StaffPage';
 import VeterinariaPage from './pages/VeterinariaPage';
 import GatewayGestoraPage from './pages/GatewayGestoraPage';
 import GestoraPage from './pages/GestoraPage';
+import MinhasFaturasPage from './pages/MinhasFaturasPage'; 
 
 // Importa o novo segurança das rotas!
 import ProtectedRoute from './ProtectedRoute';
@@ -32,6 +33,7 @@ function App() {
           <Route path="/tutor" element={<PortalTutor />} />
           <Route path="/tutor/marcacoes" element={<MarcacoesPage />} />
           <Route path="/tutor/diario/:idAnimal" element={<DiarioBordoPage />} />
+          <Route path="/tutor/faturas" element={<MinhasFaturasPage />} />
         </Route>
 
         {/* ========================================== */}

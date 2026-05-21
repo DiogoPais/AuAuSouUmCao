@@ -92,6 +92,7 @@ const GestoraPage: React.FC = () => {
     fetchData();
   }, [activeTab]);
 
+  // Função original usada para abrir ficheiros reais (ex: Vacinas)
   const handleAbrirPdf = async (chave: string) => {
     const novaAba = window.open('about:blank', '_blank');
     if (novaAba) novaAba.document.write('<h2>A carregar documento seguro...</h2>');
@@ -101,6 +102,80 @@ const GestoraPage: React.FC = () => {
     } catch (err) {
       if (novaAba) novaAba.close();
       alert("Erro ao aceder ao arquivo digital.");
+    }
+  };
+
+  // ==========================================
+  // NOVA FUNÇÃO: Gerar Recibo Virtual da Fatura
+  // ==========================================
+  const handleImprimirFatura = (fatura: Fatura) => {
+    const novaAba = window.open('', '_blank');
+    if (novaAba) {
+      // Extrair a data do nome da fatura, se possível
+      const timestampPart = fatura.documento.split('-')[1];
+      const dataEmissao = timestampPart ? new Date(parseInt(timestampPart)).toLocaleString('pt-PT') : new Date().toLocaleString('pt-PT');
+
+      novaAba.document.write(`
+        <html>
+          <head>
+            <title>Recibo - ${fatura.documento}</title>
+            <style>
+              body { font-family: 'Arial', sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7DDFD3; padding-bottom: 20px; }
+              .logo { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #7DDFD3; }
+              .details { margin-top: 30px; line-height: 1.6; }
+              .total-box { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #28a745; }
+              .print-btn { margin-top: 40px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+              @media print { .print-btn { display: none; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div>
+                <h1 style="margin:0;">Hotel Canino - AuAuSouUmCão</h1>
+                <p style="margin: 5px 0 0 0; color: #666;">Comprovativo de Pagamento</p>
+              </div>
+              <img src="https://cdn.discordapp.com/attachments/1212044201747816518/1496523823208599603/Gemini_Generated_Image_sebx2ssebx2ssebx.png?ex=69ea31eb&is=69e8e06b&hm=e86093c99b49fbbe0b718a5942cb18caa1e6e79fdf19253b2e252c75d225bb2e" class="logo" />
+            </div>
+            
+            <div class="details">
+              <p><strong>Nº Documento:</strong> ${fatura.documento}</p>
+              <p><strong>Data de Emissão:</strong> ${dataEmissao}</p>
+              <br/>
+              <p><strong>NIF do Cliente:</strong> ${fatura.nifCliente}</p>
+            </div>
+
+            <div class="total-box">
+              <h2 style="margin: 0 0 10px 0;">Total Pago: ${fatura.valorTotal.toFixed(2)} €</h2>
+              <p style="margin: 0; color: #555;"><strong>Método de Pagamento:</strong> ${fatura.metodoPagamento}</p>
+            </div>
+
+            <button class="print-btn" onclick="window.print()">🖨️ Imprimir Recibo</button>
+          </body>
+        </html>
+      `);
+      novaAba.document.close();
+    }
+  };
+
+  // NOVA FUNÇÃO: Dar Restock
+  const handleReforcarStock = async (idItem: string, nomeItem: string) => {
+    const qtdStr = window.prompt(`Recebeste uma encomenda de ${nomeItem}.\nQuantas unidades queres adicionar ao stock?`);
+    if (!qtdStr) return; 
+    
+    const qtd = parseInt(qtdStr, 10);
+    if (isNaN(qtd) || qtd <= 0) {
+      alert("Quantidade inválida.");
+      return;
+    }
+    
+    try {
+      await axios.patch(`${API_URL}/api/stock/${idItem}/reforcar`, { quantidade: qtd });
+      alert(`+${qtd} unidades de ${nomeItem} adicionadas com sucesso!`);
+      const resStock = await axios.get(`${API_URL}/api/stock`);
+      setStock(resStock.data);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao atualizar stock.');
     }
   };
 
@@ -233,7 +308,6 @@ const GestoraPage: React.FC = () => {
                     return (
                       <div 
                         key={i} 
-                        // SOLUÇÃO PONTO 2: Clicar no mesmo dia fecha o painel. Clicar noutro abre.
                         onClick={() => setDiaDetalheSelecionado(diaDetalheSelecionado?.data === nomeDia ? null : { data: nomeDia, caes: d.caes })}
                         style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: diaDetalheSelecionado?.data === nomeDia ? '#e2e6ea' : (d.ocupados >= 35 ? '#fff3cd' : '#f8f9fa'), borderRadius: '6px', borderLeft: d.ocupados >= 35 ? '4px solid #ffc107' : '4px solid #28a745', cursor: 'pointer', transition: 'background 0.2s' }}
                       >
@@ -247,7 +321,7 @@ const GestoraPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* PAINEL DINÂMICO DE CÃES (ABRE QUANDO CLICAS NUM DIA) */}
+              {/* PAINEL DINÂMICO DE CÃES */}
               {diaDetalheSelecionado && (
                 <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', border: '2px solid #0066cc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
@@ -269,15 +343,25 @@ const GestoraPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Controlo de Stock Rápido */}
+              {/* ESTADO DO ARMAZÉM */}
               <div style={{ flex: 1, minWidth: '350px', background: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Package size={20} color="#6f42c1" /> Estado do Armazém
                 </h3>
                 <ul style={{ listStyle: 'none', padding: 0, margin: '15px 0 0 0' }}>
                   {stock.length > 0 ? stock.map(item => (
-                    <li key={item.idItem} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 10px', borderBottom: '1px solid #eee' }}>
-                      <span>{item.nome} <small style={{ color: '#888' }}>({item.tipo})</small></span>
+                    <li key={item.idItem} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 10px', borderBottom: '1px solid #eee' }}>
+                      <div>
+                        <span>{item.nome} <small style={{ color: '#888' }}>({item.tipo})</small></span>
+                        <div style={{ marginTop: '6px' }}>
+                          <button 
+                            onClick={() => handleReforcarStock(item.idItem, item.nome)} 
+                            style={{ background: '#e3f2fd', color: '#0066cc', border: '1px solid #0066cc', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                          >
+                            + Receber Encomenda
+                          </button>
+                        </div>
+                      </div>
                       <span style={{ color: item.quantidade <= 10 ? '#dc3545' : '#28a745', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {item.quantidade <= 10 && <AlertTriangle size={16} />} 
                         {item.quantidade} unid.
@@ -294,7 +378,7 @@ const GestoraPage: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* ABA 1: FINANÇAS INTEGRAIS (FATURA CLICÁVEL)    */}
+        {/* ABA 1: FINANÇAS INTEGRAIS                      */}
         {/* ============================================== */}
         {activeTab === 'FINANCAS' && (
           <section className="dashboard-section no-print">
@@ -339,11 +423,12 @@ const GestoraPage: React.FC = () => {
                       <td style={{ padding: '12px' }}><span style={{ background: '#e9ecef', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>{f.metodoPagamento}</span></td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>{f.valorTotal.toFixed(2)} €</td>
                       <td style={{ padding: '12px' }}>
+                        {/* AQUI ESTÁ A ALTERAÇÃO: O botão agora desenha a fatura no momento */}
                         <button 
-                          onClick={() => handleAbrirPdf(f.documento)}
-                          style={{ background: '#007bff', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          onClick={() => handleImprimirFatura(f)}
+                          style={{ background: '#e3f2fd', color: '#007bff', border: '1px solid #007bff', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                         >
-                          📄 Abrir PDF
+                          📄 Imprimir Recibo
                         </button>
                       </td>
                     </tr>
@@ -380,7 +465,6 @@ const GestoraPage: React.FC = () => {
               </div>
             </div>
 
-            {/* SOLUÇÃO PONTO 5: BARRA DE FILTROS DOS LOGS */}
             <div className="no-print" style={{ display: 'flex', gap: '15px', marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '200px' }}>
                 <Search size={18} color="#666" />

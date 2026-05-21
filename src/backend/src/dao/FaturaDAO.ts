@@ -14,4 +14,11 @@ export class FaturaDAO {
       orderBy: { idFaturas: 'desc' } // Mostra as mais recentes primeiro
     });
   }
+
+  async buscarPorTutor(nif: string) {
+  return await prisma.faturas.findMany({
+    where: { nifCliente: nif },
+    orderBy: { idFaturas: 'desc' }
+  });
+}
 }

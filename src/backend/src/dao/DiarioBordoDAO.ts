@@ -3,21 +3,40 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class DiarioBordoDAO {
+  
   async create(descricao: string, animalId: string, fotos: string[] = []) {
+    // 1. Primeiro vamos descobrir qual é a estadia (reserva) atual do cão
+    const reservaAtiva = await prisma.reserva.findFirst({
+      where: { animalId: animalId, estado: 'CheckIn' }
+    });
+
+    // Se o cão não estiver no hotel, o sistema bloqueia a criação de logs fantasma
+    if (!reservaAtiva) {
+      throw new Error('Não é possível adicionar registos: O animal não está hospedado no momento.');
+    }
+
+    // 2. Cria o log ligado à reserva correta!
     return await prisma.diarioBordo.create({
       data: {
         descricao,
-        animalId,
+        reservaId: reservaAtiva.idReserva,
         fotos
       }
     });
   }
-// Busca todo o histórico de acontecimentos no hotel
+
+  // Busca todo o histórico de acontecimentos no hotel
   async findAll() {
     return await prisma.diarioBordo.findMany({
-      include: { animal: true },
+      // O include foi atualizado para passar pela reserva antes de chegar ao animal
+      include: { 
+        reserva: {
+          include: {
+            animal: true
+          }
+        } 
+      },
       orderBy: { timestamp: 'desc' }
     });
   }
-  
 }
