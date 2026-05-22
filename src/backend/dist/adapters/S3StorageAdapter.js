@@ -20,7 +20,7 @@ class S3StorageAdapter {
         await s3Client.send(command);
         // Se for foto de animal, devolve o link completo (público)
         // Se for documento, devolve só a Key interna (privado)
-        return pasta === 'animais'
+        return (pasta === 'animais' || pasta === 'diario')
             ? `https://${this.bucketName}.s3.${process.env.AWS_REGION || "eu-west-3"}.amazonaws.com/${chaveS3}`
             : chaveS3;
     }

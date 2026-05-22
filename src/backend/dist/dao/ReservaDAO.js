@@ -260,7 +260,7 @@ class ReservaDAO {
                 await prisma.diarioBordo.create({
                     data: {
                         descricao: `✅ [ALTA AUTOMÁTICA] O animal saiu do hotel (Check-Out), logo a quarentena médica foi encerrada no sistema.`,
-                        animalId: reserva.animalId
+                        reservaId: reserva.idReserva
                     }
                 });
             }

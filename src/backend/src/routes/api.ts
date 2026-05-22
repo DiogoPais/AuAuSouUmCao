@@ -279,11 +279,12 @@ router.get('/tarefas', async (req, res) => {
 
 router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, res) => {
   try {
-    const { nomeStaff } = req.body; 
+    // 👇 Garantimos um nome padrão caso o frontend falhe
+    const nomeStaff = req.body.nomeStaff || 'Staff'; 
     const uploadedFile = (req as any).file; 
     let fotoUrl = undefined;
 
-    // Se o Staff tirou uma foto, fazemos upload para o S3!
+    // A TUA LÓGICA ORIGINAL PARA A AWS S3 (MANTIDA!)
     if (uploadedFile) {
       fotoUrl = await s3Adapter.uploadFicheiro(
         uploadedFile.originalname,
@@ -293,7 +294,6 @@ router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, re
       );
     }
 
-    // Passamos a fotoUrl para a Facade
     const tarefa = await gestor.marcarTarefaConcluida(req.params.id, nomeStaff, fotoUrl);
     res.json(tarefa);
   } catch (error: any) {

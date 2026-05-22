@@ -5,26 +5,27 @@ const ReservaDAO_1 = require("../dao/ReservaDAO");
 const AnimalDAO_1 = require("../dao/AnimalDAO");
 const UtilizadorDAO_1 = require("../dao/UtilizadorDAO");
 const StockDAO_1 = require("../dao/StockDAO");
-const FaturaDAO_1 = require("../dao/FaturaDAO"); // NOVO: Para emitirmos faturas
-const DiarioBordoDAO_1 = require("../dao/DiarioBordoDAO");
+const FaturaDAO_1 = require("../dao/FaturaDAO");
+const DiarioBordoDAO_1 = require("../dao/DiarioBordoDAO"); // NOVO: Importamos o Diário
 class GestReservasFacade {
     reservaDAO;
     animalDAO;
     utilizadorDAO;
     stockDAO;
     faturaDAO;
+    diarioDAO; // NOVO
     constructor() {
         this.reservaDAO = new ReservaDAO_1.ReservaDAO();
         this.animalDAO = new AnimalDAO_1.AnimalDAO();
         this.utilizadorDAO = new UtilizadorDAO_1.UtilizadorDAO();
         this.stockDAO = new StockDAO_1.StockDAO();
         this.faturaDAO = new FaturaDAO_1.FaturaDAO();
+        this.diarioDAO = new DiarioBordoDAO_1.DiarioBordoDAO(); // NOVO
     }
     // ==========================================
     // REGRAS DE NEGÓCIO: RESERVAS E TAREFAS
     // ==========================================
     async criarReserva(dadosReserva, servicosAntigos) {
-        // 1. Apanhar os dados
         const { dataEntrada, dataSaida, banhos, tosquias, passeios, valor } = dadosReserva;
         const animalId = dadosReserva.idAnimal || dadosReserva.animalId;
         const entrada = new Date(dataEntrada);
@@ -42,9 +43,6 @@ class GestReservasFacade {
         }
         const reatividade = animalExiste.reatividade || 'Não Reativo';
         const boxAtribuida = await this.reservaDAO.atribuirBoxAutomaticamente(reatividade, entrada, saida);
-        // ==============================================================
-        // PASSO A: O GERADOR DE AGENDA AUTOMÁTICA
-        // ==============================================================
         const servicosParaCriar = [];
         const diasTotais = Math.ceil((saida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24));
         let b = banhos || 0;
@@ -79,9 +77,6 @@ class GestReservasFacade {
                 t--;
             }
         }
-        // ==============================================================
-        // PASSO B: DIVISÃO EQUITATIVA (ROUND-ROBIN)
-        // ==============================================================
         const equipaStaff = await this.utilizadorDAO.findByPerfil('Staff');
         if (equipaStaff.length > 0 && servicosParaCriar.length > 0) {
             let staffIndex = 0;
@@ -110,7 +105,6 @@ class GestReservasFacade {
         if (!termosAceites) {
             throw new Error("Não é possível realizar o Check-in sem a aceitação obrigatória dos Termos de Responsabilidade.");
         }
-        // Chama o novo método que altera o estado e grava o termo!
         return await this.reservaDAO.processarCheckInDB(idReserva);
     }
     async processarCheckOutCompleto(idReserva, metodoPagamento) {
@@ -122,23 +116,18 @@ class GestReservasFacade {
         const agora = new Date();
         let valorFinal = reserva.valor;
         let diasAtrasoOuAntecipacao = 0;
-        // Cálculos à Meia-Noite
         const inicioReal = new Date(reserva.dataEntrada).setHours(0, 0, 0, 0);
         const fimPrevisto = new Date(reserva.dataSaida).setHours(0, 0, 0, 0);
         const saidaReal = agora.setHours(0, 0, 0, 0);
         const diasPrevistos = Math.max(1, Math.ceil((fimPrevisto - inicioReal) / (1000 * 60 * 60 * 24)));
         const diasReais = Math.max(1, Math.ceil((saidaReal - inicioReal) / (1000 * 60 * 60 * 24)));
-        // REGRA DE NEGÓCIO: Recálculo de Preço Justo
         if (diasReais > diasPrevistos) {
-            // ATRASO: Cobra +20€ por cada dia extra
             diasAtrasoOuAntecipacao = diasReais - diasPrevistos;
             valorFinal += (diasAtrasoOuAntecipacao * 20);
         }
         else if (diasReais < diasPrevistos) {
-            // SAÍDA ANTECIPADA: Devolve 20€ por cada dia que o cão não usou!
             diasAtrasoOuAntecipacao = diasPrevistos - diasReais;
             valorFinal -= (diasAtrasoOuAntecipacao * 20);
-            // Garantia que não devolvemos dinheiro de banhos já dados (Preço Mínimo)
             if (valorFinal < 0)
                 valorFinal = 0;
         }
@@ -171,16 +160,19 @@ class GestReservasFacade {
     async listarTarefasPendentes() {
         return await this.reservaDAO.findTarefasPendentes();
     }
-    async marcarTarefaConcluida(idServico, nomeStaff = 'Staff') {
+    // 👇 Adiciona o ", fotoUrl?: string" na assinatura
+    async marcarTarefaConcluida(idServico, nomeStaff = 'Staff', fotoUrl) {
         const servico = await this.reservaDAO.findById(idServico);
         if (!servico)
             throw new Error("Tarefa não encontrada.");
         // (A tua lógica de descontar a ração fica aqui...)
         const concluido = await this.reservaDAO.marcarConcluida(idServico);
-        // 👇 A MÁGICA DO STAFF ENTRA AQUI 👇
         if (concluido.reserva?.animalId) {
             const diarioDAO = new DiarioBordoDAO_1.DiarioBordoDAO();
-            await diarioDAO.create(`✅ [TAREFA CONCLUÍDA por ${nomeStaff}] O serviço de ${concluido.tipo} foi realizado.`, concluido.reserva.animalId);
+            // 👇 A MÁGICA: Se o Staff tirou foto, criamos o Array. Se não, vai vazio!
+            const arrayDeFotos = fotoUrl ? [fotoUrl] : [];
+            await diarioDAO.create(`✅ [TAREFA CONCLUÍDA por ${nomeStaff}] O serviço de ${concluido.tipo} foi realizado.`, concluido.reserva.animalId, arrayDeFotos // 👇 AGORA SIM, A FOTO ENTRA NA BASE DE DADOS!
+            );
         }
         return concluido;
     }

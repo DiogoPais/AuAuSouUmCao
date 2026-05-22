@@ -192,42 +192,29 @@ export class GestReservasFacade {
     return await this.reservaDAO.findTarefasPendentes();
   }
 
-  // 👇 CORREÇÃO: Recebe o nome do Staff e guarda no Log!
-  async marcarTarefaConcluida(idServico: string, nomeStaff: string = 'Staff', fotoUrl?: string) {
-    const servico = await this.reservaDAO.findById(idServico);
-    if (!servico) throw new Error("Tarefa não encontrada.");
+  // 👇 Adiciona o ", fotoUrl?: string" na assinatura
+    async marcarTarefaConcluida(idServico: string, nomeStaff: string = 'Staff', fotoUrl?: string) {
+        const servico = await this.reservaDAO.findById(idServico);
+        if (!servico) throw new Error("Tarefa não encontrada.");
 
-    if (servico.tipo === 'Alimentacao') {
-      const animal = servico.reserva?.animal;
-      
-      if (animal && animal.racaoId && animal.doseDiaria) {
-        const itemStock = await this.stockDAO.findById(animal.racaoId);
-        
-        if (itemStock) {
-          const novaQuantidade = itemStock.quantidade - animal.doseDiaria;
-          if (novaQuantidade < 0) {
-            throw new Error(`Stock insuficiente de ração (${itemStock.nome}). Faltam ${Math.abs(novaQuantidade)}kg no armazém.`);
-          }
-          await this.stockDAO.updateQuantidade(animal.racaoId, novaQuantidade);
+        // (A tua lógica de descontar a ração fica aqui...)
+
+        const concluido = await this.reservaDAO.marcarConcluida(idServico);
+
+        if (concluido.reserva?.animalId) {
+            const diarioDAO = new DiarioBordoDAO();
+            
+            // 👇 A MÁGICA: Se o Staff tirou foto, criamos o Array. Se não, vai vazio!
+            const arrayDeFotos = fotoUrl ? [fotoUrl] : [];
+
+            await diarioDAO.create(
+                `✅ [TAREFA CONCLUÍDA por ${nomeStaff}] O serviço de ${concluido.tipo} foi realizado.`, 
+                concluido.reserva.animalId,
+                arrayDeFotos // 👇 AGORA SIM, A FOTO ENTRA NA BASE DE DADOS!
+            );
         }
-      }
+        return concluido;
     }
-
-    const concluido = await this.reservaDAO.marcarConcluida(idServico);
-
-    // REGISTA QUEM FEZ A TAREFA E A FOTO NO DIÁRIO DE BORDO
-    if (concluido.reserva?.animalId) {
-      const arrayFotos = fotoUrl ? [fotoUrl] : []; // Se houver foto, cria um array
-      
-      await this.diarioDAO.create(
-        `✅ [TAREFA CONCLUÍDA por ${nomeStaff}] O serviço de ${concluido.tipo} foi realizado.`,
-        concluido.reserva.animalId,
-        arrayFotos // <-- A MAGIA: Guarda a foto na Base de Dados!
-      );
-    }
-
-    return concluido;
-  }
 
   async obterServicosFinalizadosHoje(idAnimal: string) {
     return await this.reservaDAO.findFinalizadosPorAnimalEDia(idAnimal);

@@ -11,7 +11,7 @@ async function main() {
     const saltRounds = 10;
     const hashedPass = await bcrypt_1.default.hash('password123', saltRounds);
     // ==========================================
-    // 1. EQUIPA DO HOTEL E CLIENTE (O upsert não apaga nada, é seguro!)
+    // 1. EQUIPA DO HOTEL E CLIENTE 
     // ==========================================
     await prisma.utilizador.upsert({
         where: { email: 'diana@auau.pt' },
@@ -62,7 +62,7 @@ async function main() {
         }
     });
     // ==========================================
-    // 2. A MAGIA DAS 40 BOXES (Sem apagar o passado)
+    // 2. A MAGIA DAS 40 BOXES
     // ==========================================
     console.log('📦 A configurar as regras das 40 boxes...');
     const boxes = [];
@@ -75,16 +75,15 @@ async function main() {
     for (const b of boxes) {
         await prisma.box.upsert({
             where: { numero: b.numero },
-            update: { tipo: b.tipo, estado: b.estado }, // Se já existir (ex: Box 1), apenas atualiza para o novo formato!
-            create: b, // Se não existir, cria de raiz.
+            update: { tipo: b.tipo, estado: b.estado },
+            create: b,
         });
     }
-    // Se por acaso existirem boxes antigas com número superior a 40 (que já não queremos), apagamos essas.
     await prisma.box.deleteMany({
         where: { numero: { gt: 40 } }
     });
     // ==========================================
-    // 3. RESERVA DE TESTE
+    // 3. RESERVA DE TESTE COM DIÁRIO DE BORDO ATUALIZADO
     // ==========================================
     const reservaExistente = await prisma.reserva.findFirst({ where: { animalId: animal.idAnimal } });
     if (!reservaExistente) {
@@ -92,16 +91,28 @@ async function main() {
         amanha.setDate(amanha.getDate() + 5);
         await prisma.reserva.create({
             data: {
-                dataEntrada: new Date(), dataSaida: amanha, valor: 100, estado: 'CheckIn',
-                animalId: animal.idAnimal, boxNumero: 1 // Forçamos a Box 1 para o teste
+                dataEntrada: new Date(),
+                dataSaida: amanha,
+                valor: 100,
+                estado: 'CheckIn',
+                animalId: animal.idAnimal,
+                boxNumero: 1,
+                // 👇 AQUI ESTÁ A MAGIA! Criamos os logs de teste diretamente ligados à Reserva
+                diarioBordo: {
+                    create: [
+                        { descricao: '🚨 [CHECK-IN] Avaliação inicial: O Bobby chegou um pouco ansioso, mas saudável.', fotos: [] },
+                        { descricao: '✅ Alimentacao', fotos: ['https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=200&q=80'] },
+                        { descricao: '✅ Passeio higiénico matinal', fotos: [] }
+                    ]
+                }
             }
         });
+        console.log('📝 Reserva e Diário de Bordo criados com sucesso!');
     }
     // ==========================================
-    // 4. STOCK (Seguro e à prova de erros TypeScript!)
+    // 4. STOCK 
     // ==========================================
     console.log('🛒 A verificar e a semear o stock...');
-    // Função auxiliar para contornar a falta do @unique no campo 'nome'
     const semearStockSeguro = async (nomeItem, dadosCreate) => {
         const itemExiste = await prisma.stock.findFirst({ where: { nome: nomeItem } });
         if (!itemExiste) {

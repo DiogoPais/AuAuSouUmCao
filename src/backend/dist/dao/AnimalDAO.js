@@ -17,13 +17,18 @@ class AnimalDAO {
             include: { planoVacinal: true }
         });
     }
-    // Encontra um animal pelo ID e traz o seu Diário de Bordo
+    // Encontra um animal pelo ID e traz o seu Diário de Bordo (através da reserva ativa)
     async findByIdWithHistorial(idAnimal) {
         return await prisma.animal.findUnique({
             where: { idAnimal: idAnimal },
             include: {
-                diarioBordo: {
-                    orderBy: { timestamp: 'desc' }
+                reservas: {
+                    where: { estado: 'CheckIn' },
+                    include: {
+                        diarioBordo: {
+                            orderBy: { timestamp: 'desc' }
+                        }
+                    }
                 }
             }
         });
@@ -37,23 +42,23 @@ class AnimalDAO {
             }
         });
     }
+    // Busca os detalhes e logs para apresentar ao Tutor / Staff
     async animalDiario(idAnimal) {
         const animal = await prisma.animal.findUnique({
-            where: { idAnimal },
-            include: {
-                diarioBordo: {
-                    orderBy: { timestamp: 'desc' }
-                }
-            }
+            where: { idAnimal }
         });
         if (!animal) {
             return { error: 'Animal não encontrado na base de dados.' };
         }
-        const reservaAnimal = await prisma.reserva.findFirst({
-            where: { animalId: idAnimal },
+        // Procura a reserva ATIVA do animal para ir buscar os registos dessa estadia
+        const reservaAtiva = await prisma.reserva.findFirst({
+            where: { animalId: idAnimal, estado: 'CheckIn' },
             include: {
                 servicos: {
                     orderBy: { data: 'asc' }
+                },
+                diarioBordo: {
+                    orderBy: { timestamp: 'desc' }
                 }
             }
         });
@@ -61,12 +66,16 @@ class AnimalDAO {
             idAnimal: animal.idAnimal,
             nome: animal.nome,
             estadoClinico: animal.estado,
-            diarioBordo: animal.diarioBordo.map((registo) => ({
-                dataHora: registo.timestamp,
+            // Se tiver reserva ativa mapeia os logs, se não, devolve array vazio
+            diarioBordo: reservaAtiva?.diarioBordo.map((registo) => ({
+                idRegisto: registo.idRegisto,
+                timestamp: registo.timestamp,
+                dataHora: registo.timestamp, // Mantido para compatibilidade com Frontend
                 descricao: registo.descricao,
-                fotoUrl: registo.fotos[0] || ''
-            })),
-            servicos: reservaAnimal?.servicos
+                fotos: registo.fotos,
+                fotoUrl: registo.fotos[0] || '' // Mantido para compatibilidade com Frontend
+            })) || [],
+            servicos: reservaAtiva?.servicos || []
         };
     }
     // Atualiza o plano vacinal de um animal
@@ -95,29 +104,35 @@ class AnimalDAO {
             });
         }
     }
-    // Busca o historial completo do animal (diário + servicos)
+    // Busca o historial completo do animal (diário + servicos) adaptado à nova BD
     async findHistorialComDados(idAnimal) {
         const animal = await prisma.animal.findUnique({
-            where: { idAnimal },
+            where: { idAnimal }
+        });
+        if (!animal) {
+            throw new Error(`Animal com ID ${idAnimal} não encontrado.`);
+        }
+        const reservaAtiva = await prisma.reserva.findFirst({
+            where: { animalId: idAnimal, estado: 'CheckIn' },
             include: {
                 diarioBordo: {
                     orderBy: { timestamp: 'desc' }
                 }
             }
         });
-        if (!animal) {
-            throw new Error(`Animal com ID ${idAnimal} não encontrado.`);
-        }
         return {
             idAnimal: animal.idAnimal,
             nome: animal.nome,
             raca: animal.raca,
             reatividade: animal.reatividade,
             estadoClinico: animal.estado,
-            diarioBordo: animal.diarioBordo.map(d => ({
+            diarioBordo: reservaAtiva?.diarioBordo.map(d => ({
+                idRegisto: d.idRegisto,
                 dataHora: d.timestamp,
-                descricao: d.descricao
-            }))
+                timestamp: d.timestamp,
+                descricao: d.descricao,
+                fotos: d.fotos
+            })) || []
         };
     }
 }

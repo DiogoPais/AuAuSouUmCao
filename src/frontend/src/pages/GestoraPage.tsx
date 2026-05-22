@@ -18,7 +18,8 @@ interface Log {
   idRegisto: string;
   descricao: string;
   timestamp: string;
-  animal: { nome: string };
+  animal?: { nome: string }; 
+  reserva?: { animal: { nome: string } };
 }
 
 interface Documentacao {
@@ -216,7 +217,8 @@ const GestoraPage: React.FC = () => {
 
   // LÓGICA DE FILTRAGEM DOS LOGS
   const logsFiltrados = logs.filter(log => {
-    const matchAnimal = filtroAnimal ? log.animal?.nome?.toLowerCase().includes(filtroAnimal.toLowerCase()) : true;
+    const nomeCao = log.reserva?.animal?.nome || log.animal?.nome || '';
+    const matchAnimal = filtroAnimal ? nomeCao.toLowerCase().includes(filtroAnimal.toLowerCase()) : true;
     const logDataStr = new Date(log.timestamp).toISOString().split('T')[0];
     const matchData = filtroData ? logDataStr === filtroData : true;
     return matchAnimal && matchData;
@@ -228,7 +230,8 @@ const GestoraPage: React.FC = () => {
       const data = new Date(log.timestamp).toLocaleDateString('pt-PT');
       const hora = new Date(log.timestamp).toLocaleTimeString('pt-PT');
       const descSegura = log.descricao.replace(/,/g, ' '); 
-      csvContent += `${data},${hora},${log.animal?.nome || 'N/A'},"${descSegura}"\n`;
+      const nomeCao = log.reserva?.animal?.nome || log.animal?.nome || 'Sistema';
+      csvContent += `${data},${hora},${nomeCao},"${descSegura}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -510,7 +513,7 @@ const GestoraPage: React.FC = () => {
                     return (
                       <tr key={log.idRegisto} style={{ borderBottom: '1px solid #eee', backgroundColor: isAlerta ? '#fffaf0' : 'transparent' }}>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{log.animal?.nome || 'Sistema'}</td>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{log.reserva?.animal?.nome || log.animal?.nome || 'Sistema'}</td>
                         <td style={{ padding: '12px', color: isAlerta ? '#d39e00' : '#333' }}>{log.descricao}</td>
                       </tr>
                     );

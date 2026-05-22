@@ -15,20 +15,35 @@ class UtilizadorDAO {
         });
     }
     // Cria um novo Utilizador que é Tutor (usado no Registo)
+    // Cria um novo Utilizador que é Tutor (usado no Registo)
     async createTutor(nome, email, passwordHash, nif, telemovel) {
-        return await prisma.utilizador.create({
-            data: {
-                nome: nome,
-                email: email,
-                password: passwordHash,
-                tutor: {
-                    create: {
-                        nif: nif,
-                        contacto: telemovel
+        try {
+            return await prisma.utilizador.create({
+                data: {
+                    nome,
+                    email,
+                    password: passwordHash,
+                    tutor: {
+                        create: {
+                            nif,
+                            contacto: telemovel
+                        }
                     }
                 }
+            });
+        }
+        catch (error) {
+            // O código P2002 significa "Unique constraint failed"
+            if (error.code === 'P2002') {
+                if (error.meta?.target?.includes('email')) {
+                    throw new Error('Este email já está registado no nosso sistema.');
+                }
+                if (error.meta?.target?.includes('nif')) {
+                    throw new Error('Este NIF já se encontra associado a outra conta.');
+                }
             }
-        });
+            throw error; // Se for outro erro qualquer, lança-o normalmente
+        }
     }
     async countTotal() {
         return await prisma.funcionario.count();

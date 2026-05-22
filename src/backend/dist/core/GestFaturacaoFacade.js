@@ -23,5 +23,8 @@ class GestFaturacaoFacade {
             metodoPagamento: metodoPagamento // <-- AQUI ESTÁ A CORREÇÃO!
         });
     }
+    async listarFaturasDoTutor(nif) {
+        return await this.faturaDAO.buscarPorTutor(nif);
+    }
 }
 exports.GestFaturacaoFacade = GestFaturacaoFacade;

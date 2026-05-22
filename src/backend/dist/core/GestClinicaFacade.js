@@ -28,8 +28,6 @@ class GestClinicaFacade {
             dadosPrescricao.funcionarioId = funcionarioDefault.idFuncionario;
         }
         const deducoesPendentes = [];
-        // 1. Validar e converter Nomes em IDs
-        // Substitui o "for (const linha of dadosPrescricao.linhas)" por isto:
         for (const linha of dadosPrescricao.linhas) {
             if (linha.dosagem <= 0 || linha.totalDoses <= 0) {
                 throw new Error("A dosagem e o total de doses devem ser superiores a zero.");
@@ -38,7 +36,6 @@ class GestClinicaFacade {
             if (!stockItem || !stockItem.medicamento) {
                 throw new Error(`Medicamento '${linha.medicamentoId}' não encontrado no stock.`);
             }
-            // CALCULA O STOCK A DESCONTAR: (ex: toma 2 pilulas * 5 vezes = desconta 10 do stock)
             const quantidadeTotalGasta = linha.dosagem * linha.totalDoses;
             if (stockItem.quantidade < quantidadeTotalGasta) {
                 throw new Error(`Stock insuficiente para '${stockItem.nome}'. O tratamento total precisa de ${quantidadeTotalGasta}, mas o stock atual é ${stockItem.quantidade}.`);
@@ -49,9 +46,7 @@ class GestClinicaFacade {
                 novaQuantidade: stockItem.quantidade - quantidadeTotalGasta
             });
         }
-        // 2. Criar a Prescrição
         const novaPrescricao = await this.prescricaoDAO.create(dadosPrescricao);
-        // 3. Descontar o Stock
         for (const deducao of deducoesPendentes) {
             await this.stockDAO.updateQuantidade(deducao.stockId, deducao.novaQuantidade);
         }
@@ -60,9 +55,19 @@ class GestClinicaFacade {
     async listarStockCompleto() {
         return await this.stockDAO.findAll();
     }
+    async reforcarStock(idItem, quantidadeAdicionada) {
+        if (quantidadeAdicionada <= 0)
+            throw new Error("A quantidade a adicionar deve ser maior que zero.");
+        const item = await this.stockDAO.findById(idItem);
+        if (!item)
+            throw new Error("Item de stock não encontrado.");
+        const novaQuantidade = item.quantidade + quantidadeAdicionada;
+        return await this.stockDAO.updateQuantidade(idItem, novaQuantidade);
+    }
     // ==========================================
     // GESTÃO DE CHECKS DIÁRIOS E QUARENTENA
     // ==========================================
+    // 👇 CORREÇÃO: Recebe o nomeVet e passa para o DAO
     async registarCheckDiario(idAnimal, notas, nomeVet = 'Veterinário(a)') {
         if (!notas || notas.trim().length === 0) {
             throw new Error("O check deve incluir notas do veterinário.");

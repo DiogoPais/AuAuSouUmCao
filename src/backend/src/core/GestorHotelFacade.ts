@@ -138,10 +138,10 @@ export class GestorHotelFacade {
     return await this.gestReservas.listarTarefasDoDia();
   }
 
-  // 👇 ATUALIZADO: Agora recebe a fotoUrl
-  async marcarTarefaConcluida(idServico: string, nomeStaff: string = 'Staff', fotoUrl?: string) {
-    return await this.gestReservas.marcarTarefaConcluida(idServico, nomeStaff, fotoUrl);
-  }
+
+    async marcarTarefaConcluida(idServico: string, nomeStaff: string = 'Staff', fotoUrl?: string) {
+        return await this.gestReservas.marcarTarefaConcluida(idServico, nomeStaff, fotoUrl);
+    }
 
   async contarFuncionarios() {
     return await this.gestOperacoes.contarFuncionarios();

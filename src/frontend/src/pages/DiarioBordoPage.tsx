@@ -10,7 +10,7 @@ interface Registo {
   idRegisto: string;
   descricao: string;
   timestamp: string;
-  fotos?: string[]; // AQUI ESTÃO AS FOTOS!
+  fotos?: string[];
 }
 
 interface Servico {
@@ -20,8 +20,54 @@ interface Servico {
   preco: number;
 }
 
+const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1537151608804-ea2f1d71fa25?w=200&q=80';
+
+// ==========================================
+// COMPONENTE INTELIGENTE PARA LER FOTOS DA AWS S3
+// ==========================================
+const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean }> = ({ chaveFoto, isProfile = false }) => {
+  const [url, setUrl] = useState<string>(PLACEHOLDER_IMG);
+
+  useEffect(() => {
+    if (!chaveFoto || chaveFoto.trim() === '') return;
+
+    // Se já for um link público ou Base64 (retrocompatibilidade)
+    if (chaveFoto.startsWith('http') || chaveFoto.startsWith('data:image')) {
+      setUrl(chaveFoto);
+      return;
+    }
+
+    // Se for uma chave da AWS S3 (ex: diario/ficheiro.jpg)
+    const fetchS3Url = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        // Bate à porta do Backend para pedir a chave mestra temporária da AWS!
+        const res = await axios.get(`${API_URL}/api/documentos/ver/${encodeURIComponent(chaveFoto)}`);
+        if (res.data && res.data.url) {
+          setUrl(res.data.url);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar imagem da AWS:", error);
+      }
+    };
+
+    fetchS3Url();
+  }, [chaveFoto]);
+
+  return (
+    <img
+      src={url}
+      alt="Registo fotográfico"
+      style={isProfile
+        ? { width: '100%', height: '100%', objectFit: 'cover' }
+        : { width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }
+      }
+      onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMG; }}
+    />
+  );
+};
+
 const DiarioBordoPage: React.FC = () => {
-  // 👇 Alteramos aqui para apanhar 'idAnimal' ou apenas 'id'
   const params = useParams();
   const animalIdFinal = params.idAnimal || params.id; 
   
@@ -38,7 +84,7 @@ const DiarioBordoPage: React.FC = () => {
 
   useEffect(() => {
     const fetchDados = async () => {
-      if (!animalIdFinal) return; // Se não houver ID, não faz o pedido
+      if (!animalIdFinal) return;
 
       try {
         setLoading(true);
@@ -56,7 +102,6 @@ const DiarioBordoPage: React.FC = () => {
         });
         setServicos(resServicos.data || []);
       } catch (e) {
-        // Agora se falhar, vais ver o erro vermelho na consola (F12)
         console.error("Erro ao carregar o diário. O backend devolveu:", e);
       } finally {
         setLoading(false);
@@ -64,7 +109,11 @@ const DiarioBordoPage: React.FC = () => {
     };
     
     fetchDados();
-  }, [animalIdFinal]); // E usamos o ID final aqui também!
+  }, [animalIdFinal]);
+
+  // Procura a primeira chave de foto válida para usar no perfil redondo
+  const logComFoto = diario.find(log => log.fotos && log.fotos.filter(f => f.trim() !== '').length > 0);
+  const chavePerfil = (logComFoto && logComFoto.fotos) ? logComFoto.fotos.find(f => f.trim() !== '') || '' : '';
 
   if (loading) {
     return (
@@ -80,7 +129,6 @@ const DiarioBordoPage: React.FC = () => {
     <div className="diario-page-container">
       <Header userData={user} />
 
-      {/* NOVO BOTÃO DE VOLTAR */}
       <div style={{ padding: '20px 5%' }}>
         <button 
           onClick={() => navigate(-1)} 
@@ -102,7 +150,8 @@ const DiarioBordoPage: React.FC = () => {
           <p>Comportamento: Positivo</p>
         </div>
         <div className="animal-photo-circle">
-          <img src="https://images.unsplash.com/photo-1516734212448-1dd58be2cb56?w=200&q=80" alt="Foto do Cão" />
+          {/* 👇 A FOTO DE PERFIL AUTOMÁGICA CHAMA A AWS 👇 */}
+          <FotoS3 chaveFoto={chavePerfil} isProfile={true} />
         </div>
       </section>
 
@@ -110,12 +159,8 @@ const DiarioBordoPage: React.FC = () => {
         O Diário de Hoje
       </h2>
 
-      {/* ========================================== */}
-      {/* ESTRUTURA SPLIT VIEW (DUAS COLUNAS)        */}
-      {/* ========================================== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px', padding: '0 5% 40px 5%' }}>
 
-        {/* COLUNA ESQUERDA: NOTAS CLÍNICAS E AVISOS */}
         <section style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', border: '1px solid #e9ecef', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#2c3e50', borderBottom: '2px solid #7DDFD3', paddingBottom: '10px' }}>
             <FileText size={22} color="#7DDFD3" /> Notas e Observações Médicas
@@ -135,37 +180,25 @@ const DiarioBordoPage: React.FC = () => {
           </div>
         </section>
 
-        {/* COLUNA DIREITA: ATIVIDADES DO STAFF E FOTOS */}
         <section style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', border: '1px solid #e9ecef', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#2c3e50', borderBottom: '2px solid #27AE60', paddingBottom: '10px' }}>
             <CheckSquare size={22} color="#27AE60" /> Atividades e Serviços
           </h3>
           
           <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            
-            {/* 1. Tarefas Adicionais (Banhos, Passeios...) */}
-            {servicos.map(s => (
-              <div key={s.idServico} style={{ borderLeft: '4px solid #27AE60', background: 'white', padding: '12px', borderRadius: '0 8px 8px 0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: '#333' }}>✅ {s.tipo}</p>
-                <small style={{ color: '#888' }}>Realizado às {new Date(s.data).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</small>
-              </div>
-            ))}
 
-            {/* 2. Logs com Fotos (Ex: Alimentação) */}
             {diario.filter(log => log.descricao.includes('✅')).map(log => (
               <div key={log.idRegisto} style={{ borderLeft: '4px solid #27AE60', background: 'white', padding: '12px', borderRadius: '0 8px 8px 0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                 <p style={{ margin: '0 0 8px 0', color: '#333', lineHeight: '1.5' }}>{log.descricao.replace('✅', '✅ ')}</p>
                 
-                {/* LÓGICA DAS FOTOS */}
-                {log.fotos && log.fotos.length > 0 && (
+                {log.fotos && log.fotos.filter(f => f.trim() !== '').length > 0 && (
                   <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {log.fotos.map((fotoUrl, i) => (
+                    {log.fotos.filter(f => f.trim() !== '').map((chaveUrl, i) => (
                       <div key={i} style={{ position: 'relative' }}>
-                        <img 
-                          src={fotoUrl} 
-                          alt="Foto da Atividade" 
-                          style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }} 
-                        />
+                        
+                        {/* 👇 A FOTO DA ATIVIDADE TAMBÉM CHAMA A AWS 👇 */}
+                        <FotoS3 chaveFoto={chaveUrl} />
+
                         <div style={{ position: 'absolute', bottom: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', padding: '4px', borderRadius: '50%' }}>
                           <Camera size={14} color="white" />
                         </div>
@@ -180,7 +213,6 @@ const DiarioBordoPage: React.FC = () => {
               </div>
             ))}
 
-            {/* Mensagem Vazia se não houver tarefas */}
             {servicos.length === 0 && diario.filter(log => log.descricao.includes('✅')).length === 0 && (
               <p style={{ color: '#999', fontStyle: 'italic', textAlign: 'center', marginTop: '20px' }}>Nenhuma atividade registada ainda.</p>
             )}

@@ -121,14 +121,14 @@ const StaffPage: React.FC = () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       
-      // Se houver foto, preparamos como FormData (para um futuro upload de prova de serviço)
       const formData = new FormData();
       if (fotoFile) {
         formData.append('fotoProva', fotoFile);
       }
       formData.append('estado', 'Finalizado');
+      
+      formData.append('nomeStaff', staff.nome);
 
-      // Chamada à BD para concluir
       await axios.patch(`${API_URL}/api/tarefas/${id}/concluir`, formData, {
         headers: fotoFile ? { 'Content-Type': 'multipart/form-data' } : {}
       });

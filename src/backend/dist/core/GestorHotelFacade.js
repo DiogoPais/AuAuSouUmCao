@@ -79,6 +79,9 @@ class GestorHotelFacade {
     async listarStock() {
         return await this.gestClinica.listarStockCompleto();
     }
+    async reforcarStock(idItem, quantidadeAdicionada) {
+        return await this.gestClinica.reforcarStock(idItem, quantidadeAdicionada);
+    }
     // ==========================================
     // DELEGAÇÃO: VETERINÁRIA
     // ==========================================
@@ -110,9 +113,8 @@ class GestorHotelFacade {
     async listarTarefasDoDia() {
         return await this.gestReservas.listarTarefasDoDia();
     }
-    // 👇 ATUALIZADO: Agora recebe o nome do membro do Staff
-    async marcarTarefaConcluida(idServico, nomeStaff = 'Staff') {
-        return await this.gestReservas.marcarTarefaConcluida(idServico, nomeStaff);
+    async marcarTarefaConcluida(idServico, nomeStaff = 'Staff', fotoUrl) {
+        return await this.gestReservas.marcarTarefaConcluida(idServico, nomeStaff, fotoUrl);
     }
     async contarFuncionarios() {
         return await this.gestOperacoes.contarFuncionarios();
@@ -137,6 +139,12 @@ class GestorHotelFacade {
     }
     async finalizarTratamento(idLinha) {
         return await this.gestClinica.finalizarTratamento(idLinha);
+    }
+    async obterServicosFinalizadosHoje(id) {
+        return await this.gestReservas.obterServicosFinalizadosHoje(id);
+    }
+    async listarFaturasDoTutor(nif) {
+        return await this.gestFaturacao.listarFaturasDoTutor(nif);
     }
 }
 exports.GestorHotelFacade = GestorHotelFacade;
