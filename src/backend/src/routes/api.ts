@@ -141,9 +141,10 @@ router.use(authMiddleware);
 // 2. ROTAS PROTEGIDAS
 // ==========================================
 
-router.get('/documentos/ver/:chave(*)', async (req: Request, res: Response) => {
+router.get('/documentos/ver', async (req: Request, res: Response) => {
   try {
-    const { chave } = req.params;
+    const chave = req.query.chave as string;
+    if (!chave) return res.status(400).json({ error: "Chave não fornecida." });
     const urlTemporaria = await s3Adapter.gerarLinkTemporario(chave);
     res.json({ url: urlTemporaria }); 
   } catch (error: any) {
@@ -486,7 +487,11 @@ router.get('/logs', async (req, res) => {
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     const logs = await prisma.diarioBordo.findMany({ 
-      include: { animal: true },
+      include: { 
+        reserva: {
+          include: { animal: true }
+        }
+      },
       orderBy: { timestamp: 'desc' }
     });
     res.json(logs);

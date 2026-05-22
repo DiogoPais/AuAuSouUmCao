@@ -42,7 +42,9 @@ const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean }> = ({ chaveFot
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         // Bate à porta do Backend para pedir a chave mestra temporária da AWS!
-        const res = await axios.get(`${API_URL}/api/documentos/ver/${encodeURIComponent(chaveFoto)}`);
+        const res = await axios.get(`${API_URL}/api/documentos/ver`, {
+          params: { chave: chaveFoto }
+        });
         if (res.data && res.data.url) {
           setUrl(res.data.url);
         }
