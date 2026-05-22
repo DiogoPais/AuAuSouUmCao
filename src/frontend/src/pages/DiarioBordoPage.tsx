@@ -26,35 +26,10 @@ const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1537151608804-ea2f1d7
 // COMPONENTE INTELIGENTE PARA LER FOTOS DA AWS S3
 // ==========================================
 const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean }> = ({ chaveFoto, isProfile = false }) => {
-  const [url, setUrl] = useState<string>(PLACEHOLDER_IMG);
-
-  useEffect(() => {
-    if (!chaveFoto || chaveFoto.trim() === '') return;
-
-    // Se já for um link público ou Base64 (retrocompatibilidade)
-    if (chaveFoto.startsWith('http') || chaveFoto.startsWith('data:image')) {
-      setUrl(chaveFoto);
-      return;
-    }
-
-    // Se for uma chave da AWS S3 (ex: diario/ficheiro.jpg)
-    const fetchS3Url = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        // Bate à porta do Backend para pedir a chave mestra temporária da AWS!
-        const res = await axios.get(`${API_URL}/api/documentos/ver`, {
-          params: { chave: chaveFoto }
-        });
-        if (res.data && res.data.url) {
-          setUrl(res.data.url);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar imagem da AWS:", error);
-      }
-    };
-
-    fetchS3Url();
-  }, [chaveFoto]);
+  // Se já for URL completo, usa diretamente. Se for chave relativa, constrói o URL.
+  const url = chaveFoto.startsWith('http')
+    ? chaveFoto
+    : `https://hotel-animais-assets-auau-2026.s3.eu-west-3.amazonaws.com/${chaveFoto}`;
 
   return (
     <img
