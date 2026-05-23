@@ -5,6 +5,8 @@ import apiRoutes from './routes/api';
 import path from 'path';
 // ADICIONA ESTA LINHA:
 import { iniciarJobsDeReservas } from './jobs/ReservaJobs';
+import { iniciarJobsDeTarefas } from './jobs/TarefasJobs';
+import { iniciarJobsVeterinaria } from './jobs/VeterinariaJobs';
 
 dotenv.config();
 const app = express();
@@ -33,4 +35,6 @@ app.listen(PORT, () => {
     
     // ADICIONA ESTA LINHA: Acorda o trabalhador invis vel!
     iniciarJobsDeReservas();
+    iniciarJobsDeTarefas();
+    iniciarJobsVeterinaria();
 });

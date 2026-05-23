@@ -219,4 +219,12 @@ export class GestReservasFacade {
   async obterServicosFinalizadosHoje(idAnimal: string) {
     return await this.reservaDAO.findFinalizadosPorAnimalEDia(idAnimal);
   }
+
+  async listarBoxesSujas() {
+        return await this.reservaDAO.findBoxesSujas();
+    }
+    async limparBox(numero: number) {
+        return await this.reservaDAO.marcarBoxComoLimpa(numero);
+    }
+    
 }

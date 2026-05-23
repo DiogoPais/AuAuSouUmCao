@@ -19,6 +19,7 @@ enum EstadoServico {
   Feito
   Pendente
   Finalizado
+  Falhado
 }
 
 enum EstadoVacina {

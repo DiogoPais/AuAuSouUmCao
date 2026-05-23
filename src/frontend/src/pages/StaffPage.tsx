@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MapPin, Camera, AlertTriangle, CheckCircle } from 'lucide-react';
+import { MapPin, Camera, AlertTriangle, CheckCircle, Droplets } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './StaffPage.css';
@@ -17,6 +17,8 @@ interface Box {
   numero: number;
   tamanho: number;
   ocupacao: number;
+  estado?: string;
+  tipo?: string;
 }
 
 interface Reserva {
@@ -86,7 +88,13 @@ const StaffPage: React.FC = () => {
     perfil: localStorage.getItem('role') || 'Staff',
   };
 
+  // 👇 NOVO ESTADO: Controlador das abas
+  const [activeTab, setActiveTab] = useState<'ANIMAIS' | 'LIMPEZAS'>('ANIMAIS');
+  
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
+  // 👇 NOVO ESTADO: Guarda as boxes sujas
+  const [boxesSujas, setBoxesSujas] = useState<Box[]>([]);
+  
   const [tarefaSelecionada, setTarefaSelecionada] = useState<Tarefa | null>(null);
   const [staffCount, setStaffCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -102,11 +110,16 @@ const StaffPage: React.FC = () => {
         setLoading(true);
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         
-        const resTarefas = await axios.get(`${API_URL}/api/tarefas`);
-        setTarefas(resTarefas.data);
+        // 👇 Agora fazemos 3 pedidos: Tarefas, Staff e Boxes Sujas
+        const [resTarefas, resStaff, resBoxes] = await Promise.all([
+          axios.get(`${API_URL}/api/tarefas`),
+          axios.get(`${API_URL}/api/funcionarios/count`),
+          axios.get(`${API_URL}/api/tarefas/limpezas`) // Rota que criaste no backend
+        ]);
 
-        const resStaff = await axios.get(`${API_URL}/api/funcionarios/count`);
+        setTarefas(resTarefas.data);
         setStaffCount(resStaff.data.total);
+        setBoxesSujas(resBoxes.data);
       } catch (err) {
         console.error('Erro ao buscar dados:', err);
       } finally {
@@ -115,7 +128,7 @@ const StaffPage: React.FC = () => {
     };
 
     fetchDados();
-  }, []);
+  }, [activeTab]); // Recarrega sempre que trocarmos de aba
 
   const concluirTarefa = async (id: string) => {
     try {
@@ -126,7 +139,6 @@ const StaffPage: React.FC = () => {
         formData.append('fotoProva', fotoFile);
       }
       formData.append('estado', 'Finalizado');
-      
       formData.append('nomeStaff', staff.nome);
 
       await axios.patch(`${API_URL}/api/tarefas/${id}/concluir`, formData, {
@@ -143,6 +155,18 @@ const StaffPage: React.FC = () => {
     }
   };
 
+  // 👇 NOVA FUNÇÃO: Limpar a box
+  const limparBox = async (numero: number) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      await axios.patch(`${API_URL}/api/tarefas/limpezas/${numero}`);
+      setBoxesSujas(boxesSujas.filter(b => b.numero !== numero));
+      alert(`Box ${numero} higienizada e pronta para receber o próximo cão! ✨`);
+    } catch (err: any) {
+      alert('Erro ao atualizar a Box.');
+    }
+  };
+
   // ==========================================
   // LÓGICA DA CÂMARA DO TELEMÓVEL
   // ==========================================
@@ -154,7 +178,7 @@ const StaffPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setFotoFile(file);
-      setFotoPreview(URL.createObjectURL(file)); // Gera uma miniatura para o Staff ver
+      setFotoPreview(URL.createObjectURL(file)); 
     }
   };
 
@@ -188,7 +212,7 @@ const StaffPage: React.FC = () => {
     return (
       <div className="staff-page-container">
         <Header userData={staff} />
-        <div className="loading">Carregando tarefas...</div>
+        <div className="loading">A atualizar tarefas operacionais...</div>
         <Footer />
       </div>
     );
@@ -200,121 +224,176 @@ const StaffPage: React.FC = () => {
 
       <main className="staff-main">
         <div className="staff-info-bar">
-          <p><strong>Staff:</strong> {staffCount} membros</p>
-          <p><strong>Tarefas do dia:</strong> {tarefasSeguras.length}</p>
+          <p><strong>Staff em turno:</strong> {staffCount} membros</p>
+          <p><strong>Operações pendentes:</strong> {tarefasSeguras.length + boxesSujas.length}</p>
+        </div>
+
+        {/* 👇 TABS DE NAVEGAÇÃO DA EQUIPA */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', padding: '0 5%' }}>
+          <button 
+            onClick={() => setActiveTab('ANIMAIS')} 
+            style={{ flex: 1, padding: '12px', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: 'pointer', backgroundColor: activeTab === 'ANIMAIS' ? '#004d40' : '#ddd', color: activeTab === 'ANIMAIS' ? 'white' : '#666', transition: '0.3s' }}
+          >
+            🐾 Cuidados Caninos
+          </button>
+          <button 
+            onClick={() => setActiveTab('LIMPEZAS')} 
+            style={{ flex: 1, padding: '12px', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: 'pointer', backgroundColor: activeTab === 'LIMPEZAS' ? '#004d40' : '#ddd', color: activeTab === 'LIMPEZAS' ? 'white' : '#666', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', transition: '0.3s' }}
+          >
+            <Droplets size={18} /> Manutenção
+            {boxesSujas.length > 0 && <span style={{ background: '#dc3545', color: 'white', padding: '2px 8px', borderRadius: '20px', fontSize: '12px' }}>{boxesSujas.length}</span>}
+          </button>
         </div>
 
         <div className="staff-content">
-          <section className="tarefas-section">
-            <h2>Tarefas Atribuídas:</h2>
+          
+          {/* ============================================== */}
+          {/* ABA 1: CUIDADOS DOS ANIMAIS                    */}
+          {/* ============================================== */}
+          {activeTab === 'ANIMAIS' && (
+            <>
+              <section className="tarefas-section">
+                <h2>Tarefas Atribuídas:</h2>
 
-            <div className="tarefas-lista">
-              {tarefasSeguras.length > 0 ? (
-                Object.entries(tarefasPorData).map(([data, tarefasDodia]) => (
-                  <div key={data}>
-                    <h4 className="tarefa-data" style={{ background: '#eee', padding: '5px 10px', borderRadius: '4px', marginTop: '15px' }}>{data}</h4>
-                    {tarefasDodia.map((tarefa) => (
-                      <div
-                        key={tarefa.idServico}
-                        className={`tarefa-card ${tarefaSelecionada?.idServico === tarefa.idServico ? 'ativo' : ''}`}
-                        onClick={() => {
-                          setTarefaSelecionada(tarefa);
-                          setFotoPreview(null); // Limpa a foto se trocar de tarefa
-                          setFotoFile(null);
-                        }}
-                      >
-                        <div className="tarefa-header">
-                          <h3>{getTipoLabel(tarefa.tipo)}</h3>
-                        </div>
-                        <p className="tarefa-info">
-                          Cão: <strong>{tarefa.reserva?.animal?.nome || 'N/A'}</strong> (jaula {tarefa.reserva?.box?.numero || 'N/A'})
-                        </p>
-                        <p className="tarefa-horario">
-                          Hora: {new Date(tarefa.data).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                <div className="tarefas-lista">
+                  {tarefasSeguras.length > 0 ? (
+                    Object.entries(tarefasPorData).map(([data, tarefasDodia]) => (
+                      <div key={data}>
+                        <h4 className="tarefa-data" style={{ background: '#eee', padding: '5px 10px', borderRadius: '4px', marginTop: '15px' }}>{data}</h4>
+                        {tarefasDodia.map((tarefa) => (
+                          <div
+                            key={tarefa.idServico}
+                            className={`tarefa-card ${tarefaSelecionada?.idServico === tarefa.idServico ? 'ativo' : ''}`}
+                            onClick={() => {
+                              setTarefaSelecionada(tarefa);
+                              setFotoPreview(null); 
+                              setFotoFile(null);
+                            }}
+                          >
+                            <div className="tarefa-header">
+                              <h3>{getTipoLabel(tarefa.tipo)}</h3>
+                            </div>
+                            <p className="tarefa-info">
+                              Cão: <strong>{tarefa.reserva?.animal?.nome || 'N/A'}</strong> (jaula {tarefa.reserva?.box?.numero || 'N/A'})
+                            </p>
+                            <p className="tarefa-horario">
+                              Hora: {new Date(tarefa.data).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <p className="no-tarefas">O dia de hoje está livre de tarefas! 🎉</p>
-              )}
-            </div>
-          </section>
-
-          {tarefaSelecionada && (
-            <section className="detalhes-section">
-              <h3>{getTipoLabel(tarefaSelecionada.tipo)}</h3>
-              
-              {/* O NOVO MAPA COM ALAS FICA LOGO AQUI NO TOPO */}
-              <div style={{ marginBottom: '20px' }}>
-                <MapaHotel boxNumero={tarefaSelecionada.reserva?.box?.numero} />
-              </div>
-
-              <div className="detalhes-card">
-                <p className="detalhes-info">
-                  Cão: <strong>{tarefaSelecionada.reserva?.animal?.nome || 'N/A'}</strong>
-                </p>
-                <p className="detalhes-horario">
-                  Horário Agendado: {new Date(tarefaSelecionada.data).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
-                </p>
-                <p className="detalhes-race">
-                  Raça: <strong>{tarefaSelecionada.reserva?.animal?.raca || 'N/A'}</strong>
-                </p>
-
-                <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#fff3cd', borderRadius: '6px', border: '1px solid #ffe69c' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#856404', marginBottom: '8px' }}>
-                    <AlertTriangle size={18} />
-                    <strong style={{ fontSize: '14px' }}>Informações de Segurança:</strong>
-                  </div>
-                  <p style={{ margin: '0 0 5px 0', color: '#856404', fontSize: '14px' }}>
-                    <strong>Sensibilidade:</strong> {tarefaSelecionada.reserva?.animal?.reatividade || 'Normal'}
-                  </p>
-                  <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
-                    <strong>Trela Recomendada:</strong> {tarefaSelecionada.reserva?.animal?.tipoTrela || 'Normal'}
-                  </p>
-                </div>
-
-                {/* BOTÃO E PREVIEW DA FOTO */}
-                <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment" // Força o telemóvel a abrir a câmara traseira!
-                    ref={fileInputRef} 
-                    onChange={handleFotoCapturada} 
-                    style={{ display: 'none' }} 
-                  />
-                  
-                  {!fotoPreview ? (
-                    <button className="btn-foto-grande" onClick={handleAbrirCamera} style={{ display: 'flex', justifyContent: 'center', gap: '8px', width: '100%', alignItems: 'center' }}>
-                      <Camera size={20} /> Capturar Foto do Serviço
-                    </button>
+                    ))
                   ) : (
-                    <div style={{ border: '2px dashed #ccc', padding: '10px', borderRadius: '8px' }}>
-                      <img src={fotoPreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }} />
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
-                        <span style={{ color: '#28a745', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <CheckCircle size={16} /> Foto Anexada
-                        </span>
-                        <button onClick={handleAbrirCamera} style={{ background: 'transparent', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}>
-                          Tirar Novamente
-                        </button>
-                      </div>
-                    </div>
+                    <p className="no-tarefas">O dia de hoje está livre de tarefas! 🎉</p>
                   )}
                 </div>
-              </div>
+              </section>
 
-              <button
-                className="btn-feito-grande"
-                onClick={() => concluirTarefa(tarefaSelecionada.idServico)}
-                style={{ marginTop: '20px' }}
-              >
-                ✓ Tarefa Concluída
-              </button>
+              {tarefaSelecionada && (
+                <section className="detalhes-section">
+                  <h3>{getTipoLabel(tarefaSelecionada.tipo)}</h3>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <MapaHotel boxNumero={tarefaSelecionada.reserva?.box?.numero} />
+                  </div>
+
+                  <div className="detalhes-card">
+                    <p className="detalhes-info">
+                      Cão: <strong>{tarefaSelecionada.reserva?.animal?.nome || 'N/A'}</strong>
+                    </p>
+                    <p className="detalhes-horario">
+                      Horário Agendado: {new Date(tarefaSelecionada.data).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+                    </p>
+                    <p className="detalhes-race">
+                      Raça: <strong>{tarefaSelecionada.reserva?.animal?.raca || 'N/A'}</strong>
+                    </p>
+
+                    <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#fff3cd', borderRadius: '6px', border: '1px solid #ffe69c' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#856404', marginBottom: '8px' }}>
+                        <AlertTriangle size={18} />
+                        <strong style={{ fontSize: '14px' }}>Informações de Segurança:</strong>
+                      </div>
+                      <p style={{ margin: '0 0 5px 0', color: '#856404', fontSize: '14px' }}>
+                        <strong>Sensibilidade:</strong> {tarefaSelecionada.reserva?.animal?.reatividade || 'Normal'}
+                      </p>
+                      <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
+                        <strong>Trela Recomendada:</strong> {tarefaSelecionada.reserva?.animal?.tipoTrela || 'Normal'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        ref={fileInputRef} 
+                        onChange={handleFotoCapturada} 
+                        style={{ display: 'none' }} 
+                      />
+                      
+                      {!fotoPreview ? (
+                        <button className="btn-foto-grande" onClick={handleAbrirCamera} style={{ display: 'flex', justifyContent: 'center', gap: '8px', width: '100%', alignItems: 'center' }}>
+                          <Camera size={20} /> Capturar Foto do Serviço
+                        </button>
+                      ) : (
+                        <div style={{ border: '2px dashed #ccc', padding: '10px', borderRadius: '8px' }}>
+                          <img src={fotoPreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }} />
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
+                            <span style={{ color: '#28a745', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <CheckCircle size={16} /> Foto Anexada
+                            </span>
+                            <button onClick={handleAbrirCamera} style={{ background: 'transparent', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}>
+                              Tirar Novamente
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn-feito-grande"
+                    onClick={() => concluirTarefa(tarefaSelecionada.idServico)}
+                    style={{ marginTop: '20px' }}
+                  >
+                    ✓ Tarefa Concluída
+                  </button>
+                </section>
+              )}
+            </>
+          )}
+
+          {/* ============================================== */}
+          {/* ABA 2: LIMPEZA DE BOXES                        */}
+          {/* ============================================== */}
+          {activeTab === 'LIMPEZAS' && (
+            <section style={{ width: '100%', background: '#fff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
+              <h2 style={{ borderBottom: '2px solid #7DDFD3', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Droplets color="#004d40" /> Limpezas e Higienização Pendentes
+              </h2>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px', marginTop: '20px' }}>
+                {boxesSujas.length > 0 ? boxesSujas.map(box => (
+                  <div key={box.numero} style={{ border: '1px solid #ffc107', background: '#fff3cd', borderRadius: '8px', padding: '15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, color: '#856404' }}>BOX {box.numero}</h3>
+                      <span style={{ background: '#dc3545', color: 'white', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>Suja</span>
+                    </div>
+                    <p style={{ margin: '10px 0', fontSize: '14px', color: '#666' }}>Tipo: {box.tipo || 'Standard'}</p>
+                    <button 
+                      onClick={() => limparBox(box.numero)}
+                      style={{ width: '100%', background: '#28a745', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                    >
+                      <CheckCircle size={18} /> Marcar como Limpa
+                    </button>
+                  </div>
+                )) : (
+                  <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '30px' }}>O Hotel está a brilhar! Não há boxes a necessitar de limpeza no momento. ✨</p>
+                )}
+              </div>
             </section>
           )}
+
         </div>
       </main>
 

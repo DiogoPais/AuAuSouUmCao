@@ -182,4 +182,11 @@ export class GestorHotelFacade {
     return await this.gestFaturacao.listarFaturasDoTutor(nif);
   }
 
+  async listarBoxesSujas() {
+        return await this.gestReservas.listarBoxesSujas();
+    }
+    async limparBox(numero: number) {
+        return await this.gestReservas.limparBox(numero);
+    }
+
 }

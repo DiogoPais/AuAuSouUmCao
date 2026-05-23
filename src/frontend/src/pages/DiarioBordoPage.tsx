@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, CheckSquare, Camera } from 'lucide-react';
+import { ArrowLeft, FileText, CheckSquare, Camera, X } from 'lucide-react'; // 👈 Adicionado o 'X' aqui
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './DiarioBordoPage.css';
@@ -25,7 +25,8 @@ const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1537151608804-ea2f1d7
 // ==========================================
 // COMPONENTE INTELIGENTE PARA LER FOTOS DA AWS S3
 // ==========================================
-const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean }> = ({ chaveFoto, isProfile = false }) => {
+// 👇 Adicionámos a propriedade onClick para ele saber quando é clicado
+const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean; onClick?: (url: string) => void }> = ({ chaveFoto, isProfile = false, onClick }) => {
   // Se já for URL completo, usa diretamente. Se for chave relativa, constrói o URL.
   const url = chaveFoto.startsWith('http')
     ? chaveFoto
@@ -37,8 +38,10 @@ const FotoS3: React.FC<{ chaveFoto: string; isProfile?: boolean }> = ({ chaveFot
       alt="Registo fotográfico"
       style={isProfile
         ? { width: '100%', height: '100%', objectFit: 'cover' }
-        : { width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }
+        // 👇 Adicionámos o 'cursor: pointer' se ele receber a função onClick
+        : { width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd', cursor: onClick ? 'pointer' : 'default' }
       }
+      onClick={() => onClick && onClick(url)} // 👇 Dispara a função quando clicado
       onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMG; }}
     />
   );
@@ -53,6 +56,9 @@ const DiarioBordoPage: React.FC = () => {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [animalInfo, setAnimalInfo] = useState({ nome: 'A carregar...', estadoClinico: '...' });
   const [loading, setLoading] = useState(true);
+
+  // 👇 NOVO ESTADO: Guarda a foto que está ampliada no momento
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   const user = {
     nome: localStorage.getItem('user_nome') || "Utilizador",
@@ -127,7 +133,6 @@ const DiarioBordoPage: React.FC = () => {
           <p>Comportamento: Positivo</p>
         </div>
         <div className="animal-photo-circle">
-          {/* 👇 A FOTO DE PERFIL AUTOMÁGICA CHAMA A AWS 👇 */}
           <FotoS3 chaveFoto={chavePerfil} isProfile={true} />
         </div>
       </section>
@@ -173,10 +178,13 @@ const DiarioBordoPage: React.FC = () => {
                     {log.fotos.filter(f => f.trim() !== '').map((chaveUrl, i) => (
                       <div key={i} style={{ position: 'relative' }}>
                         
-                        {/* 👇 A FOTO DA ATIVIDADE TAMBÉM CHAMA A AWS 👇 */}
-                        <FotoS3 chaveFoto={chaveUrl} />
+                        {/* 👇 A FOTO DA ATIVIDADE AGORA PASSA O URL PARA AMPLIAR 👇 */}
+                        <FotoS3 
+                          chaveFoto={chaveUrl} 
+                          onClick={(url) => setFotoAmpliada(url)} 
+                        />
 
-                        <div style={{ position: 'absolute', bottom: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', padding: '4px', borderRadius: '50%' }}>
+                        <div style={{ position: 'absolute', bottom: '5px', right: '5px', background: 'rgba(0,0,0,0.6)', padding: '4px', borderRadius: '50%', pointerEvents: 'none' }}>
                           <Camera size={14} color="white" />
                         </div>
                       </div>
@@ -199,6 +207,46 @@ const DiarioBordoPage: React.FC = () => {
       </div>
 
       <Footer />
+
+      {/* ========================================== */}
+      {/* O ECRÃ PRETO COM A FOTO GIGANTE (LIGHTBOX) */}
+      {/* ========================================== */}
+      {fotoAmpliada && (
+        <div 
+          onClick={() => setFotoAmpliada(null)} // Clicar no ecrã preto também fecha a foto
+          style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: 9999,
+            display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'zoom-out'
+          }}
+        >
+          {/* Botão de Fechar no canto superior direito */}
+          <button 
+            onClick={() => setFotoAmpliada(null)}
+            style={{ 
+              position: 'absolute', top: '20px', right: '30px', 
+              background: 'none', border: 'none', color: 'white', 
+              cursor: 'pointer', padding: '10px'
+            }}
+          >
+            <X size={32} />
+          </button>
+          
+          {/* A foto em ponto grande no centro do ecrã */}
+          <img 
+            src={fotoAmpliada} 
+            alt="Foto Ampliada" 
+            style={{ 
+              maxWidth: '90%', maxHeight: '90%', 
+              objectFit: 'contain', borderRadius: '8px', 
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              cursor: 'default' 
+            }} 
+            onClick={(e) => e.stopPropagation()} // Impede que ao clicar NA foto o ecrã feche acidentalmente
+          />
+        </div>
+      )}
+
     </div>
   );
 };

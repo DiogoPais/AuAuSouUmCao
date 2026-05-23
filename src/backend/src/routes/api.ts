@@ -302,6 +302,20 @@ router.patch('/tarefas/:id/concluir', upload.single('fotoProva'), async (req, re
   }
 });
 
+router.get('/tarefas/limpezas', async (req, res) => {
+  try {
+    const sujas = await gestor.listarBoxesSujas();
+    res.json(sujas);
+  } catch (error: any) { res.status(400).json({ error: error.message }); }
+});
+
+router.patch('/tarefas/limpezas/:numero', async (req, res) => {
+  try {
+    const boxLimpa = await gestor.limparBox(Number(req.params.numero));
+    res.json(boxLimpa);
+  } catch (error: any) { res.status(400).json({ error: error.message }); }
+});
+
 router.get('/funcionarios/count', async (req, res) => {
   try {
     const total = await gestor.contarFuncionarios();
