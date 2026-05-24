@@ -40,7 +40,7 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!utilizador || !(await bcrypt.compare(password, utilizador.password))) {
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
-    if(utilizador.tutor){
+    if(utilizador.tutor) {
       // Gerar código 2FA
       const code = generate2FACode();
       store2FACode(utilizador.email, code);

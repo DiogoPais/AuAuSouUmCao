@@ -79,6 +79,96 @@ const MapaHotel: React.FC<{ boxNumero?: number }> = ({ boxNumero }) => {
   );
 };
 
+const SliderConfirmar: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
+  const [offset, setOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const THRESHOLD = 0.75; // 75% do track para confirmar
+
+  const handleStart = (clientX: number) => {
+    setDragging(true);
+    setOffset(0);
+  };
+
+  const handleMove = (clientX: number) => {
+    if (!dragging || !trackRef.current) return;
+    const trackWidth = trackRef.current.offsetWidth;
+    const thumbWidth = 60;
+    const maxOffset = trackWidth - thumbWidth;
+    const rect = trackRef.current.getBoundingClientRect();
+    const newOffset = Math.max(0, Math.min(clientX - rect.left - thumbWidth / 2, maxOffset));
+    setOffset(newOffset);
+
+    if (newOffset / maxOffset >= THRESHOLD) {
+      setDragging(false);
+      setOffset(maxOffset);
+      setTimeout(onConfirm, 300);
+    }
+  };
+
+  const handleEnd = () => {
+    if (dragging) {
+      setDragging(false);
+      setOffset(0); // volta atrás se não chegou ao fim
+    }
+  };
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      <p style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+        Desliza para confirmar conclusão →
+      </p>
+      <div
+        ref={trackRef}
+        style={{
+          position: 'relative', height: '56px',
+          background: '#e0f5f0', borderRadius: '28px',
+          overflow: 'hidden', userSelect: 'none'
+        }}
+        onMouseMove={(e) => handleMove(e.clientX)}
+        onMouseUp={handleEnd}
+        onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+        onTouchEnd={handleEnd}
+      >
+        {/* Barra de progresso */}
+        <div style={{
+          position: 'absolute', left: 0, top: 0,
+          width: offset + 60, height: '100%',
+          background: 'rgba(16, 185, 129, 0.2)',
+          transition: dragging ? 'none' : 'width 0.3s ease'
+        }} />
+
+        {/* Thumb arrastável */}
+        <div
+          style={{
+            position: 'absolute', left: offset,
+            top: '4px', width: '48px', height: '48px',
+            background: '#10b981', borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'grab', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            transition: dragging ? 'none' : 'left 0.3s ease',
+            color: 'white', fontSize: '20px'
+          }}
+          onMouseDown={(e) => handleStart(e.clientX)}
+          onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+        >
+          ✓
+        </div>
+
+        {/* Texto central */}
+        <div style={{
+          position: 'absolute', width: '100%', height: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', color: '#004d40',
+          fontWeight: '600', fontSize: '14px', paddingLeft: '60px'
+        }}>
+          Desliza para concluir
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const StaffPage: React.FC = () => {
   const staff = {
@@ -290,76 +380,101 @@ const StaffPage: React.FC = () => {
               </section>
 
               {tarefaSelecionada && (
-                <section className="detalhes-section">
-                  <h3>{getTipoLabel(tarefaSelecionada.tipo)}</h3>
-                  
-                  <div style={{ marginBottom: '20px' }}>
-                    <MapaHotel boxNumero={tarefaSelecionada.reserva?.box?.numero} />
+              <section className="detalhes-section">
+
+                {/* 2. MAPA */}
+                <MapaHotel boxNumero={tarefaSelecionada.reserva?.box?.numero} />
+
+                {/* 1. ALERTA DE SEGURANÇA — PRIMEIRO, SEMPRE */}
+                {tarefaSelecionada.reserva?.animal?.reatividade !== 'Não Reativo' && (
+                  <div style={{
+                    background: '#dc3545', color: 'white',
+                    padding: '12px 16px', borderRadius: '8px',
+                    marginBottom: '14px', marginTop: '20px',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    fontSize: '15px', fontWeight: 'bold'
+                  }}>
+                    <AlertTriangle size={22} />
+                    ATENÇÃO: Cão Reativo — Trela {tarefaSelecionada.reserva?.animal?.tipoTrela || 'Halti'}
                   </div>
+                )}
 
-                  <div className="detalhes-card">
-                    <p className="detalhes-info">
-                      Cão: <strong>{tarefaSelecionada.reserva?.animal?.nome || 'N/A'}</strong>
-                    </p>
-                    <p className="detalhes-horario">
-                      Horário Agendado: {new Date(tarefaSelecionada.data).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
-                    </p>
-                    <p className="detalhes-race">
-                      Raça: <strong>{tarefaSelecionada.reserva?.animal?.raca || 'N/A'}</strong>
-                    </p>
+                {/* 3. INFO BÁSICA */}
+                <div className="detalhes-card" style={{ marginTop: '16px' }}>
+                  <p className="detalhes-info">
+                    Cão: <strong>{tarefaSelecionada.reserva?.animal?.nome || 'N/A'}</strong>
+                  </p>
+                  <p className="detalhes-horario">
+                    {new Date(tarefaSelecionada.data).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+                  </p>
+                  <p className="detalhes-race">
+                    Raça: <strong>{tarefaSelecionada.reserva?.animal?.raca || 'N/A'}</strong>
+                  </p>
+                </div>
 
-                    <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#fff3cd', borderRadius: '6px', border: '1px solid #ffe69c' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#856404', marginBottom: '8px' }}>
-                        <AlertTriangle size={18} />
-                        <strong style={{ fontSize: '14px' }}>Informações de Segurança:</strong>
-                      </div>
-                      <p style={{ margin: '0 0 5px 0', color: '#856404', fontSize: '14px' }}>
-                        <strong>Sensibilidade:</strong> {tarefaSelecionada.reserva?.animal?.reatividade || 'Normal'}
-                      </p>
-                      <p style={{ margin: 0, color: '#856404', fontSize: '14px' }}>
-                        <strong>Trela Recomendada:</strong> {tarefaSelecionada.reserva?.animal?.tipoTrela || 'Normal'}
-                      </p>
-                    </div>
+                {/* 4. ZONA DE FOTO + CONFIRMAÇÃO — ÁREA DEDICADA */}
+                <div style={{
+                  marginTop: '20px',
+                  border: '2px dashed #7DDFD3',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  background: '#f8fffd',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#004d40', fontSize: '14px' }}>
+                    📸 Prova do Serviço (opcional)
+                  </p>
 
-                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        capture="environment" 
-                        ref={fileInputRef} 
-                        onChange={handleFotoCapturada} 
-                        style={{ display: 'none' }} 
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    ref={fileInputRef}
+                    onChange={handleFotoCapturada}
+                    style={{ display: 'none' }}
+                  />
+
+                  {!fotoPreview ? (
+                    <button
+                      onClick={handleAbrirCamera}
+                      style={{
+                        width: '100%', padding: '14px',
+                        background: '#004d40', color: 'white',
+                        border: 'none', borderRadius: '8px',
+                        fontSize: '15px', fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: '8px'
+                      }}
+                    >
+                      <Camera size={20} /> Abrir Câmara
+                    </button>
+                  ) : (
+                    <div>
+                      <img
+                        src={fotoPreview}
+                        alt="Preview"
+                        style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '8px' }}
                       />
-                      
-                      {!fotoPreview ? (
-                        <button className="btn-foto-grande" onClick={handleAbrirCamera} style={{ display: 'flex', justifyContent: 'center', gap: '8px', width: '100%', alignItems: 'center' }}>
-                          <Camera size={20} /> Capturar Foto do Serviço
-                        </button>
-                      ) : (
-                        <div style={{ border: '2px dashed #ccc', padding: '10px', borderRadius: '8px' }}>
-                          <img src={fotoPreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }} />
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '10px' }}>
-                            <span style={{ color: '#28a745', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <CheckCircle size={16} /> Foto Anexada
-                            </span>
-                            <button onClick={handleAbrirCamera} style={{ background: 'transparent', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}>
-                              Tirar Novamente
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      <button
+                        onClick={handleAbrirCamera}
+                        style={{
+                          marginTop: '8px', background: 'transparent',
+                          border: 'none', color: '#007bff',
+                          textDecoration: 'underline', cursor: 'pointer', fontSize: '13px'
+                        }}
+                      >
+                        Tirar novamente
+                      </button>
                     </div>
-                  </div>
+                  )}
 
-                  <button
-                    className="btn-feito-grande"
-                    onClick={() => concluirTarefa(tarefaSelecionada.idServico)}
-                    style={{ marginTop: '20px' }}
-                  >
-                    ✓ Tarefa Concluída
-                  </button>
-                </section>
-              )}
+                  {/* SLIDER DE CONFIRMAÇÃO */}
+                  <SliderConfirmar onConfirm={() => concluirTarefa(tarefaSelecionada.idServico)} />
+                </div>
+
+              </section>
+            )}
             </>
           )}
 
@@ -396,8 +511,6 @@ const StaffPage: React.FC = () => {
 
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

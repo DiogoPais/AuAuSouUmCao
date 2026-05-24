@@ -22,7 +22,10 @@ describe('Testes de Integração - API de Autenticação', () => {
   // LIMPEZA DE SEGURANÇA: Apagar o utilizador de teste antes E depois dos testes 
   // para garantir que a Base de Dados não acumula lixo.
   const limparDB = async () => {
-    // CORREÇÃO: Utilizar o nome dos modelos no singular, como definido no teu schema.prisma
+    // 1. Apagar primeiro quaisquer animais que tenham ficado associados a este NIF de teste
+    await prisma.animal.deleteMany({ where: { tutorNif: testUser.nif } });
+
+    // 2. Agora já podemos apagar o Tutor e o Utilizador sem violar Chaves Estrangeiras!
     await prisma.tutor.deleteMany({ where: { nif: testUser.nif } });
     await prisma.utilizador.deleteMany({ where: { email: testUser.email } });
   };
