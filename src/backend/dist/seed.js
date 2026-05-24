@@ -10,6 +10,7 @@ async function main() {
     console.log('🚀 A atualizar contas, criar animais e a semear as 40 novas boxes...');
     const saltRounds = 10;
     const hashedPass = await bcrypt_1.default.hash('password123', saltRounds);
+    const hashedPassE = await bcrypt_1.default.hash('123', saltRounds);
     // ==========================================
     // 1. EQUIPA DO HOTEL E CLIENTE 
     // ==========================================
@@ -51,6 +52,22 @@ async function main() {
         create: {
             nome: 'João Tutor', email: 'tutor@auau.pt', password: hashedPass,
             tutor: { create: { nif: '123456789', contacto: '912345678' } }
+        }
+    });
+    await prisma.utilizador.upsert({
+        where: { email: 'hugoaraujocunha2005@gmail.com' },
+        update: { password: hashedPassE },
+        create: {
+            nome: 'Hugo Cunha', email: 'hugoaraujocunha2005@gmail.com', password: hashedPassE,
+            tutor: { create: { nif: '1250917019', contacto: '937712990' } }
+        }
+    });
+    await prisma.utilizador.upsert({
+        where: { email: 'dmpais1999@gmail.com' },
+        update: { password: hashedPassE },
+        create: {
+            nome: 'Diogo Pais', email: 'dmpais1999@gmail.com', password: hashedPassE,
+            tutor: { create: { nif: '123454321', contacto: '123454321' } }
         }
     });
     const animal = await prisma.animal.upsert({

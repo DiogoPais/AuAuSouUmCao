@@ -85,7 +85,7 @@ const SliderConfirmar: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => 
   const trackRef = useRef<HTMLDivElement>(null);
   const THRESHOLD = 0.75; // 75% do track para confirmar
 
-  const handleStart = (clientX: number) => {
+  const handleStart = (_clientX: number) => {
     setDragging(true);
     setOffset(0);
   };
