@@ -222,7 +222,7 @@ const RececaoPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1 style={{ fontSize: '26px' }}>Fatura Proforma</h1>
             <div className="logo-circle" style={{ width: '100px', height: '100px', border: '2px solid #7DDFD3' }}>
-              <img src="https://cdn.discordapp.com/attachments/1212044201747816518/1496523823208599603/Gemini_Generated_Image_sebx2ssebx2ssebx.png?ex=69ea31eb&is=69e8e06b&hm=e86093c99b49fbbe0b718a5942cb18caa1e6e79fdf19253b2e252c75d225bb2e" alt="Logo" />
+              <img src={logoImg} alt="Logo" />
             </div>
           </div>
 
