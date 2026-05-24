@@ -146,5 +146,11 @@ class GestorHotelFacade {
     async listarFaturasDoTutor(nif) {
         return await this.gestFaturacao.listarFaturasDoTutor(nif);
     }
+    async listarBoxesSujas() {
+        return await this.gestReservas.listarBoxesSujas();
+    }
+    async limparBox(numero) {
+        return await this.gestReservas.limparBox(numero);
+    }
 }
 exports.GestorHotelFacade = GestorHotelFacade;

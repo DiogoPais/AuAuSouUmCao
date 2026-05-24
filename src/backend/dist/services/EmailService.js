@@ -8,8 +8,8 @@ const nodemailer_1 = __importDefault(require("nodemailer"));
 // Configurar o transporter para envio de emails
 const transporter = nodemailer_1.default.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com', // Exemplo para Gmail
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: false, // true para 465, false para outros
+    port: parseInt(process.env.EMAIL_PORT || '465'),
+    secure: true, // true para 465, false para outros
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,

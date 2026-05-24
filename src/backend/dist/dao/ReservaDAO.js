@@ -292,5 +292,20 @@ class ReservaDAO {
             }
         });
     }
+    // ==========================================
+    // MANUTENÇÃO DE BOXES
+    // ==========================================
+    async findBoxesSujas() {
+        return await prisma.box.findMany({
+            where: { estado: 'Suja' },
+            orderBy: { numero: 'asc' }
+        });
+    }
+    async marcarBoxComoLimpa(numeroBox) {
+        return await prisma.box.update({
+            where: { numero: numeroBox },
+            data: { estado: 'Limpa' }
+        });
+    }
 }
 exports.ReservaDAO = ReservaDAO;

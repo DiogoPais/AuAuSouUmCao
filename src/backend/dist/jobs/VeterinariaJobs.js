@@ -22,5 +22,6 @@ const iniciarJobsVeterinaria = () => {
             console.error('[CRON JOB ERRO] Falha ao fazer reset:', error);
         }
     });
+    console.log('🕒 Cron Job de Veterinária inicializado (Agendado para as 00:00).');
 };
 exports.iniciarJobsVeterinaria = iniciarJobsVeterinaria;

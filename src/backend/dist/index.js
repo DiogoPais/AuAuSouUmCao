@@ -10,6 +10,8 @@ const api_1 = __importDefault(require("./routes/api"));
 const path_1 = __importDefault(require("path"));
 // ADICIONA ESTA LINHA:
 const ReservaJobs_1 = require("./jobs/ReservaJobs");
+const TarefasJobs_1 = require("./jobs/TarefasJobs");
+const VeterinariaJobs_1 = require("./jobs/VeterinariaJobs");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -31,4 +33,6 @@ app.listen(PORT, () => {
     console.log(`Health Check: http://localhost:${PORT}/health`);
     // ADICIONA ESTA LINHA: Acorda o trabalhador invis vel!
     (0, ReservaJobs_1.iniciarJobsDeReservas)();
+    (0, TarefasJobs_1.iniciarJobsDeTarefas)();
+    (0, VeterinariaJobs_1.iniciarJobsVeterinaria)();
 });

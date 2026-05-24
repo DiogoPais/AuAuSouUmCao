@@ -98,7 +98,7 @@ const GestoraPage: React.FC = () => {
     const novaAba = window.open('about:blank', '_blank');
     if (novaAba) novaAba.document.write('<h2>A carregar documento seguro...</h2>');
     try {
-      const res = await axios.get(`${API_URL}/api/documentos/ver/${chave}`);
+      const res = await axios.get(`${API_URL}/api/documentos/ver`, { params: { chave } });
       if (novaAba) novaAba.location.href = res.data.url;
     } catch (err) {
       if (novaAba) novaAba.close();
