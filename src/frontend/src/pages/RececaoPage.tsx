@@ -3,6 +3,7 @@ import axios from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './RececaoPage.css';
+import logoImg from '../../foto.webp';
 
 interface Reserva {
   idReserva: string;
@@ -97,7 +98,7 @@ const RececaoPage: React.FC = () => {
                 <h1 style="margin:0;">Hotel Canino - AuAuSouUmCão</h1>
                 <p style="margin: 5px 0 0 0; color: #666;">Comprovativo de Pagamento</p>
               </div>
-              <img src="https://cdn.discordapp.com/attachments/1212044201747816518/1496523823208599603/Gemini_Generated_Image_sebx2ssebx2ssebx.png?ex=69ea31eb&is=69e8e06b&hm=e86093c99b49fbbe0b718a5942cb18caa1e6e79fdf19253b2e252c75d225bb2e" class="logo" />
+              <img src=${logoImg} class="logo" />
             </div>
             
             <div class="details">
