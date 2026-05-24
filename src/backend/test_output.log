@@ -1,0 +1,261 @@
+
+> backend@1.0.0 test:coverage
+> c8 jest --runInBand
+
+FAIL src/tests/unit/DAOs.test.ts
+  ● Test suite failed to run
+
+    [96msrc/tests/unit/DAOs.test.ts[0m:[93m744[0m:[93m67[0m - [91merror[0m[90m TS2345: [0mArgument of type 'string' is not assignable to parameter of type 'number | bigint'.
+
+    [7m744[0m           expect(faturas[i - 1].idFaturas).toBeGreaterThanOrEqual(faturas[i].idFaturas);
+    [7m   [0m [91m                                                                  ~~~~~~~~~~~~~~~~~~~~[0m
+
+PASS src/tests/integration/extra_int.test.ts (10.509 s)
+  Testes de Integração - Rotas Adicionais
+    Proteção de rotas - sem token JWT
+      ✓ GET /animais deve retornar 401 sem token (31 ms)
+      ✓ GET /reservas deve retornar 401 sem token (4 ms)
+      ✓ GET /stock deve retornar 401 sem token (2 ms)
+    GET /animais e /animais/tutor/:nif
+      ✓ GET /animais deve retornar lista de animais (HTTP 200) (510 ms)
+      ✓ GET /animais/tutor/:nif deve retornar os animais do tutor (HTTP 200) (143 ms)
+    PATCH /plano-vacinal/:idAnimal
+      ✓ deve atualizar o plano vacinal com data válida (HTTP 200) (365 ms)
+      ✓ deve falhar com animal inexistente (HTTP 400/404/500) (43 ms)
+    GET /tarefas e conclusão de tarefas
+      ✓ GET /tarefas deve retornar lista de tarefas do dia (HTTP 200) (610 ms)
+      ✓ PATCH /tarefas/:id/concluir deve marcar a tarefa como concluída (HTTP 200) (1037 ms)
+      ✓ PATCH /tarefas/:id/concluir deve falhar com id inválido (HTTP 400/404/500) (40 ms)
+    GET /tarefas/limpezas e PATCH /tarefas/limpezas/:numero
+      ✓ GET /tarefas/limpezas deve retornar as boxes sujas (HTTP 200) (73 ms)
+      ✓ PATCH /tarefas/limpezas/1 deve responder com sucesso ou 404 (HTTP 200/404/500) (75 ms)
+    Rotas de veterinária
+      ✓ GET /veterinaria/caes-para-verificar deve retornar lista (HTTP 200) (718 ms)
+      ✓ GET /veterinaria/caes-quarentena deve retornar lista (HTTP 200) (80 ms)
+      ✓ POST /veterinaria/check-diario/:idAnimal deve registar check com notas (HTTP 200/201) (221 ms)
+      ✓ PATCH /veterinaria/quarentena/:idAnimal deve ativar quarentena com motivo (HTTP 200/201) (184 ms)
+      ✓ GET /veterinaria/tratamentos-ativos deve retornar lista (HTTP 200) (84 ms)
+      ✓ GET /veterinaria/prescricoes/:animalId deve retornar prescrições do animal (HTTP 200) (76 ms)
+    GET /stock e PATCH /stock/:idItem/reforcar
+      ✓ GET /stock deve retornar lista de itens (HTTP 200) (565 ms)
+      ✓ PATCH /stock/:idItem/reforcar deve adicionar quantidade ao stock (HTTP 200) (148 ms)
+      ✓ PATCH /stock/:idItem/reforcar deve falhar com quantidade zero (HTTP 400/500) (5 ms)
+    GET /faturas/tutor/:nif
+      ✓ deve retornar as faturas do tutor (HTTP 200) (402 ms)
+    GET /funcionarios e /funcionarios/count
+      ✓ GET /funcionarios/count deve retornar contagem (HTTP 200) (398 ms)
+      ✓ GET /funcionarios deve retornar lista (HTTP 200) (145 ms)
+
+PASS src/tests/integration/reservas.test.ts
+  Testes de Integração - API de Reservas
+    POST /reservas
+      ✓ deve criar uma reserva com sucesso (HTTP 201) (2132 ms)
+      ✓ deve falhar (HTTP 400) se o animal tentar marcar duas vezes para as mesmas datas (113 ms)
+    Fluxo da Receção: Check-In e Check-Out
+      ✓ deve falhar o Check-in (HTTP 400) se os termos não forem aceites (5 ms)
+      ✓ deve aprovar o Check-in e mudar o estado (HTTP 200) com termos aceites (214 ms)
+      ✓ deve falhar o Check-out (HTTP 400) sem método de pagamento (4 ms)
+      ✓ deve processar o Check-out e gerar a Fatura Final (HTTP 200) (735 ms)
+
+  console.log
+    Enviando email para teste.integracao@hotel.com com assunto "Código de Confirmação 2FA - AuAuSouUmCão" e texto "O seu código de confirmação é: 26324. Este código expira em 10 minutos."
+
+      at sendEmail (src/services/EmailService.ts:22:11)
+
+PASS src/tests/integration/auth.test.ts
+  Testes de Integração - API de Autenticação
+    POST /register
+      ✓ deve registar um novo tutor com sucesso e retornar HTTP 201 (807 ms)
+      ✓ deve devolver erro HTTP 400 se o email já estiver registado (263 ms)
+    POST /login
+      ✓ deve devolver erro HTTP 401 para credenciais inválidas (password errada) (155 ms)
+      ✓ deve fazer login com sucesso e exigir código 2FA para Tutores (1747 ms)
+
+PASS src/tests/integration/veterinaria.test.ts
+  Testes de Integração - API de Veterinária (Prescrições e Stock)
+    POST /veterinaria/prescricao
+      ✓ deve criar uma prescrição e deduzir stock com sucesso (HTTP 201) (1406 ms)
+      ✓ deve falhar (HTTP 400) se o veterinário tentar prescrever mais do que há em stock (115 ms)
+
+PASS src/tests/unit/GestReservasFacade_extra.test.ts
+  GestReservasFacade - Testes Adicionais (Cobertura Extra)
+    Método: processarCheckOutCompleto — ajuste de valor
+      ✓ não deve ajustar o valor quando o check-out ocorre exatamente no dia previsto (1 ms)
+      ✓ deve cobrar 20€ por cada dia extra quando o check-out ocorre depois da saída prevista (1 ms)
+      ✓ deve descontar 20€ por cada dia antecipado quando o check-out ocorre antes da saída prevista (1 ms)
+      ✓ não deve devolver valor negativo mesmo com desconto superior ao valor original (1 ms)
+      ✓ deve criar a fatura com o método de pagamento correto e chamar processarCheckOutDB (3 ms)
+    Método: marcarTarefaConcluida
+      ✓ deve lançar erro se a tarefa não existir (8 ms)
+      ✓ deve marcar como concluída e criar entrada no diário sem foto
+      ✓ deve criar entrada no diário com a foto quando fotoUrl é fornecido (1 ms)
+      ✓ não deve tentar criar entrada no diário quando a tarefa não tem animalId (9 ms)
+    Métodos de delegação simples
+      ✓ cancelarReserva deve chamar updateEstado com "Cancelada" (1 ms)
+      ✓ eliminarReserva deve chamar delete no DAO
+      ✓ listarTodas deve retornar a lista de reservas do DAO (1 ms)
+      ✓ listarTarefasDoDia deve retornar as tarefas do DAO
+      ✓ listarBoxesSujas deve retornar as boxes sujas do DAO
+      ✓ limparBox deve chamar marcarBoxComoLimpa com o número correto
+
+PASS src/tests/unit/GestHotelFacade.test.ts
+  GestorHotelFacade - Testes Unitários
+    Delegações para GestHospedesFacade
+      ✓ criarConta deve delegar a criarContaTutor com os argumentos corretos (1 ms)
+      ✓ buscarUtilizador deve delegar a buscarUtilizadorPorEmail
+      ✓ registarAnimal deve delegar a GestHospedes com dados e vacinas (1 ms)
+      ✓ listarAnimais deve delegar a listarTodosAnimais
+      ✓ listarAnimaisTutor deve delegar com o NIF correto
+      ✓ atualizarPlanoVacinal deve delegar com idAnimal e dados (1 ms)
+      ✓ animalDiario deve delegar com o animalId correto
+    Delegações para GestReservasFacade
+      ✓ efetuarReserva deve delegar a criarReserva (1 ms)
+      ✓ listarReservas deve delegar a listarTodas (1 ms)
+      ✓ checkIn deve delegar a confirmarCheckIn (1 ms)
+      ✓ checkOut deve delegar a processarCheckOutCompleto (1 ms)
+      ✓ cancelarReserva deve delegar corretamente (2 ms)
+      ✓ apagarReserva deve delegar a eliminarReserva (1 ms)
+      ✓ listarTarefasDoDia deve delegar corretamente (1 ms)
+      ✓ marcarTarefaConcluida deve delegar com todos os argumentos (1 ms)
+      ✓ listarBoxesSujas deve delegar corretamente (1 ms)
+      ✓ limparBox deve delegar com o número da box (1 ms)
+    Delegações para GestOperacoesFacade, GestFaturacaoFacade e GestClinicaFacade
+      ✓ adicionarRegistoDiario deve delegar a GestOperacoes (1 ms)
+      ✓ faturarReserva deve delegar a gerarFaturaFinal (1 ms)
+      ✓ listarFaturasDoTutor deve delegar com o NIF
+      ✓ prescreverMedicacao deve delegar a GestClinica (1 ms)
+      ✓ listarStock deve delegar a listarStockCompleto
+      ✓ reforcarStock deve delegar com idItem e quantidade (1 ms)
+      ✓ registarCheckDiario deve delegar com idAnimal, notas e nomeVet (1 ms)
+      ✓ listarCaesParaVerificar deve delegar a GestClinica (1 ms)
+      ✓ ativarQuarentena deve delegar com idAnimal e motivo (1 ms)
+      ✓ desativarQuarentena deve delegar com o idAnimal (1 ms)
+      ✓ listarTratamentosAtivos deve delegar a GestClinica (1 ms)
+      ✓ registarAdministracaoMedicamento deve delegar com idLinha e idFuncionario (1 ms)
+      ✓ finalizarTratamento deve delegar com o idLinha (1 ms)
+      ✓ contarFuncionarios deve delegar a GestOperacoes (2 ms)
+      ✓ listarFuncionarios deve delegar a GestOperacoes (1 ms)
+
+PASS src/tests/unit/GestClinicaFacade_extra.test.ts
+  GestClinicaFacade - Testes Adicionais (Cobertura Extra)
+    Método: reforcarStock
+      ✓ deve adicionar a quantidade ao stock existente e retornar o item atualizado (1 ms)
+      ✓ deve lançar erro se a quantidade a adicionar for zero (5 ms)
+      ✓ deve lançar erro se a quantidade a adicionar for negativa (1 ms)
+      ✓ deve lançar erro se o item de stock não existir
+    Método: registarCheckDiario
+      ✓ deve registar o check diário com notas válidas e nome do veterinário
+      ✓ deve usar "Veterinário(a)" como nome por defeito quando não é fornecido (1 ms)
+      ✓ deve lançar erro se as notas estiverem vazias
+      ✓ deve lançar erro se as notas forem apenas espaços em branco (1 ms)
+    Método: ativarQuarentena
+      ✓ deve ativar a quarentena com motivo válido (1 ms)
+      ✓ deve lançar erro se o motivo estiver vazio
+      ✓ deve lançar erro se o motivo for apenas espaços em branco
+    Método: registarAdministracao
+      ✓ deve registar a administração quando os dados são válidos (1 ms)
+      ✓ deve lançar erro se o idLinha estiver vazio (1 ms)
+      ✓ deve lançar erro se o idFuncionario estiver vazio
+    Método: prescreverMedicacao — edge case sem veterinário disponível
+      ✓ deve lançar erro se não existir nenhum veterinário na DB quando o funcionarioId é omitido (1 ms)
+    Métodos de listagem e delegação
+      ✓ listarStockCompleto deve retornar todos os itens do stock (1 ms)
+      ✓ listarCaesParaVerificar deve delegar ao DAO
+      ✓ listarEmQuarentena deve delegar ao DAO (1 ms)
+      ✓ desativarQuarentena deve delegar ao DAO com o ID correto (1 ms)
+      ✓ verificarSeJaFoiCheckHoje deve delegar ao DAO
+      ✓ listarPrescricoesAnimal deve retornar prescrições por animal
+      ✓ listarTratamentosAtivos deve delegar ao DAO
+      ✓ finalizarTratamento deve delegar ao DAO com o idLinha correto (1 ms)
+
+PASS src/tests/unit/GestReservasFacade.test.ts
+  GestReservasFacade - Testes Unitários
+    Método: criarReserva
+      ✓ deve criar uma reserva com sucesso quando os dados e as datas são válidos (1 ms)
+      ✓ deve lançar erro "Datas inválidas" quando dataSaida é igual a dataEntrada (5 ms)
+      ✓ deve lançar erro "Datas inválidas" quando dataSaida é anterior a dataEntrada (1 ms)
+      ✓ deve lançar erro "Animal não encontrado" se o animal não existir na DB (1 ms)
+      ✓ deve lançar erro se o animal já possuir uma reserva ativa (1 ms)
+    Método: confirmarCheckIn
+      ✓ deve processar o check-in com sucesso quando os termos são aceites (1 ms)
+      ✓ deve lançar um erro sobre obrigatoriedade se termosAceites for falso (1 ms)
+    Método: processarCheckOutCompleto
+      ✓ deve lançar erro se o método de pagamento não for passado (1 ms)
+      ✓ deve lançar erro se a reserva a fechar não for encontrada (1 ms)
+
+PASS src/tests/unit/GestHospedesFacade.test.ts
+  GestHospedesFacade - Testes Unitários
+    Método: criarContaTutor
+      ✓ deve criar uma nova conta de tutor com sucesso quando o email é válido e novo (1 ms)
+      ✓ deve lançar erro se o email não possuir um formato válido (ex: sem @) (4 ms)
+      ✓ deve lançar erro se já existir uma conta registada com o mesmo email
+    Método: registarAnimal
+      ✓ deve registar o animal utilizando o microchip fornecido pelo tutor
+      ✓ deve gerar um microchip provisório caso o animal não possua microchip (1 ms)
+      ✓ deve garantir que o plano vacinal submetido é guardado com isValido = false e estado = Valido
+    Método: atualizarPlanoVacinal
+      ✓ deve atualizar o plano vacinal com sucesso se a data e o animal forem válidos (1 ms)
+      ✓ deve lançar erro ao tentar atualizar vacinas de um animal inexistente
+      ✓ deve lançar erro se a data da vacina for inválida
+
+PASS src/tests/unit/GestClinicaFacade.test.ts
+  GestClinicaFacade - Testes Unitários
+    Método: prescreverMedicacao
+      ✓ deve criar uma prescrição com sucesso e deduzir a quantidade correta do stock (2 ms)
+      ✓ deve lançar erro se a prescrição não contiver pelo menos um medicamento (4 ms)
+      ✓ deve lançar erro se a dosagem ou o total de doses for inferior ou igual a zero
+      ✓ deve lançar erro se o item solicitado não for encontrado no stock
+      ✓ deve lançar erro detalhado se a quantidade em stock for insuficiente para a prescrição (1 ms)
+      ✓ deve permitir criar a prescrição se a quantidade requerida for exatamente igual ao stock disponível (1 ms)
+
+PASS src/tests/unit/GestOperacoesFacade.test.ts
+  GestOperacoesFacade - Testes Unitários
+    Método: adicionarRegistoDiario
+      ✓ deve criar o registo quando apenas uma descrição é fornecida (1 ms)
+      ✓ deve criar o registo quando a descrição é vazia mas contém pelo menos uma foto (1 ms)
+      ✓ deve lançar erro se tentar criar um registo sem descrição e sem fotografias (3 ms)
+    Métodos Auxiliares de Funcionários
+      ✓ deve invocar o DAO correto ao contar funcionários por perfil
+
+PASS src/tests/unit/GestFaturacaoFacade.test.ts
+  GestFaturacaoFacade - Testes Unitários
+    Método: gerarFaturaFinal
+      ✓ deve gerar uma fatura de 150.00€ associada ao NIF e com o método de pagamento fornecido (1 ms)
+      ✓ deve gerar fatura utilizando "Não Definido" caso o método de pagamento não seja passado (1 ms)
+
+Test Suites: 1 failed, 12 passed, 13 total
+Tests:       136 passed, 136 total
+Snapshots:   0 total
+Time:        37.41 s
+Ran all test suites.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+-------------------------|---------|----------|---------|---------|---------------------------------
+File                     | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s               
+-------------------------|---------|----------|---------|---------|---------------------------------
+All files                |   73.84 |       84 |   83.87 |   73.84 |                                 
+ adapters                |   41.46 |       60 |      50 |   41.46 |                                 
+  S3StorageAdapter.ts    |   41.46 |       60 |      50 |   41.46 | 13-33,39-41                     
+ core                    |   95.83 |    97.36 |   94.04 |   95.83 |                                 
+  GestClinicaFacade.ts   |     100 |      100 |     100 |     100 |                                 
+  GestFaturacaoFacade.ts |     100 |      100 |     100 |     100 |                                 
+  GestHospedesFacade.ts  |     100 |      100 |     100 |     100 |                                 
+  GestOperacoesFacade.ts |     100 |      100 |     100 |     100 |                                 
+  GestReservasFacade.ts  |   93.47 |    90.69 |   91.66 |   93.47 | 81-86,98-104,208-209            
+  GestorHotelFacade.ts   |   92.18 |      100 |      90 |   92.18 | 53-54,128-130,163-168,179-182   
+ dao                     |   63.45 |    76.56 |   69.09 |   63.45 |                                 
+  AnimalDAO.ts           |   54.96 |       75 |    62.5 |   54.96 | ...8,62-103,119,132-140,144-151 
+  DiarioBordoDAO.ts      |   76.19 |       75 |   66.66 |   76.19 | 20-24,38-42                     
+  FaturaDAO.ts           |      75 |      100 |      75 |      75 | 15-20                           
+  LogsDAO.ts             |     100 |      100 |     100 |     100 |                                 
+  PrescricaoDAO.ts       |   56.94 |    83.33 |      80 |   56.94 | 80-117,181-239,262-288          
+  ReservaDAO.ts          |   66.19 |    59.09 |   55.55 |   66.19 | ...-244,265-267,282-294,332-352 
+  StockDAO.ts            |    82.5 |      100 |      80 |    82.5 | 28-34                           
+  UtilizadorDAO.ts       |    64.7 |    85.71 |   83.33 |    64.7 | 43-65,72-78                     
+ middleware              |     100 |     87.5 |     100 |     100 |                                 
+  auth.ts                |     100 |     87.5 |     100 |     100 | 5                               
+ routes                  |    62.8 |    61.66 |     100 |    62.8 |                                 
+  api.ts                 |    62.8 |    61.66 |     100 |    62.8 | ...-460,495-498,502-519,522-527 
+ services                |      90 |    72.72 |   85.71 |      90 |                                 
+  EmailService.ts        |     100 |    57.14 |     100 |     100 | 5-19                            
+  TwoFactorService.ts    |      80 |      100 |      75 |      80 | 21-25                           
+-------------------------|---------|----------|---------|---------|---------------------------------
