@@ -9,7 +9,7 @@ import { iniciarJobsDeTarefas } from './jobs/TarefasJobs';
 import { iniciarJobsVeterinaria } from './jobs/VeterinariaJobs';
 
 dotenv.config();
-const app = express();
+const app = express(); 
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
