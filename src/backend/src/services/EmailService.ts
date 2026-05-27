@@ -2,22 +2,23 @@ import nodemailer from 'nodemailer';
 
 // Configurar o transporter para envio de emails
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com', // Exemplo para Gmail
-  port: parseInt(process.env.EMAIL_PORT || '465'),
-  secure: true, // true para 465, false para outros
+  host: 'smtp.gmail.com', // Vamos forçar o host aqui para garantir
+  port: 587,              // 👈 Voltamos à porta 587
+  secure: false,          // 👈 CRÍTICO: Tem de ser false para a porta 587!
+  family: 4,              // 👈 Mantém-se para evitar aquele erro original do IPv6
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.EMAIL_USER || '', 
+    pass: process.env.EMAIL_PASS || '', 
   },
-});
+} as any);
 
 export const sendEmail = async (to: string, subject: string, text: string, html?: string) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to,
     subject,
-    text, // O texto simples fica como plano B (fallback) caso o email do cliente não suporte HTML
-    html: html || text, // Se passares HTML, ele usa o HTML!
+    text,
+    html: html || text,
   };
   console.log(`Enviando email para ${to} com assunto "${subject}" e texto "${text}"`);
 
